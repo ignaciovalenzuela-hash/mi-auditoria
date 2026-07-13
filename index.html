@@ -14,7 +14,35 @@
             align-items: center;
             height: 100vh;
             margin: 0;
+            overflow: hidden;
         }
+        
+        /* Animación de la flecha superior */
+        .arrow-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #27ae60;
+            font-weight: bold;
+            font-size: 16px;
+            animation: bounce 1.5s infinite;
+            z-index: 10;
+            text-align: center;
+        }
+        .arrow-icon {
+            font-size: 40px;
+            line-height: 1;
+            margin-bottom: 5px;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translate(-50%, 0); }
+            50% { transform: translate(-50%, -15px); }
+        }
+
         .container {
             background: white;
             padding: 40px;
@@ -22,6 +50,8 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             text-align: center;
             max-width: 500px;
+            position: relative;
+            margin-top: 50px;
         }
         h1 {
             color: #2980b9;
@@ -33,23 +63,34 @@
             color: #7f8c8d;
             margin-bottom: 30px;
         }
-        .bookmarklet-btn {
+        
+        /* Contenedor del botón para mantener el diseño visual sin afectar el nombre del marcador */
+        .btn-wrapper {
             display: inline-block;
             background: linear-gradient(135deg, #27ae60, #2ecc71);
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-wrapper:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.6);
+        }
+        
+        /* El botón en sí: su texto será el nombre del marcador */
+        .bookmarklet-btn {
+            display: inline-block;
             color: white;
             text-decoration: none;
             padding: 15px 30px;
             font-size: 18px;
             font-weight: bold;
-            border-radius: 50px;
-            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
-            transition: transform 0.2s, box-shadow 0.2s;
             cursor: grab;
         }
-        .bookmarklet-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.6);
+        .bookmarklet-btn:active {
+            cursor: grabbing;
         }
+
         .instructions {
             margin-top: 40px;
             text-align: left;
@@ -76,20 +117,27 @@
 </head>
 <body>
 
+    <!-- Flecha animada en la parte superior -->
+    <div class="arrow-container">
+        <div class="arrow-icon">⬆️</div>
+        <div>Suelta el botón en tu barra de marcadores aquí arriba</div>
+    </div>
+
     <div class="container">
         <h1>🚀 Auditoría eCampus</h1>
         <p>Instala la herramienta inteligente para revisar foros, accesos y calificaciones en un solo clic.</p>
         
-        <a class="bookmarklet-btn" href="javascript:(function(){var u='https://ignaciovalenzuela-hash.github.io/mi-auditoria/extractor.js';var s=document.createElement('script');s.src=u+'?v='+Math.random();document.body.appendChild(s);})();" onclick="event.preventDefault(); alert('¡No hagas clic! Arrastra este botón hacia tu barra de marcadores en la parte superior de tu navegador.');">
-            🚀 Instalar Revisor eCampus
-        </a>
+        <!-- El texto de este enlace es exactamente el nombre con el que se guardará -->
+        <div class="btn-wrapper">
+            <a class="bookmarklet-btn" href="javascript:(function(){var u='https://ignaciovalenzuela-hash.github.io/mi-auditoria/extractor.js';var s=document.createElement('script');s.src=u+'?v='+Math.random();document.body.appendChild(s);})();" onclick="event.preventDefault(); alert('¡No me hagas clic! 😅 Mantén presionado este botón y arrástralo hacia tu barra de marcadores en la parte superior de la pantalla.');" title="Revisor eCampus">Revisor eCampus</a>
+        </div>
 
         <div class="instructions">
             <h3>¿Cómo instalarlo?</h3>
             <ol>
                 <li>Asegúrate de que tu <b>Barra de marcadores</b> esté visible (Presiona <code>Ctrl + Shift + B</code> en Windows o <code>Cmd + Shift + B</code> en Mac).</li>
-                <li>Haz clic en el botón verde de arriba, <b>mantenlo presionado y arrástralo</b> hacia tu barra de marcadores.</li>
-                <li>¡Listo! Ahora entra a eCampus y haz clic en el nuevo marcador para iniciar la auditoría.</li>
+                <li>Haz clic en el botón verde, <b>mantenlo presionado y arrástralo</b> hacia arriba, hacia tu barra de marcadores.</li>
+                <li>¡Listo! Ahora entra a eCampus y haz clic en <b>"Revisor eCampus"</b> para iniciar la auditoría.</li>
             </ol>
         </div>
     </div>
