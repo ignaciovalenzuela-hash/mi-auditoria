@@ -1,6 +1,6 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[51014, 51063];
+const ids=[51014, 51063, 51098, 51122, 51181, 53631, 51015, 51064, 51099, 51123, 51147, 53632, 51016, 51065, 51100, 51148, 51183, 53633, 51017, 51066, 51101, 51125, 51149, 53634, 51018, 51067, 51150, 51174, 51185, 53635, 51019, 51020, 51021, 51022, 51023, 51024, 51073, 51103, 51151, 51175, 51025, 51074, 51104, 51128, 51152, 51026, 51075, 51105, 51153, 51177, 51027, 51106, 51130, 51154, 51178, 51028, 51077, 51107, 51131, 51155, 51029, 51078, 51030, 51079, 51031, 51080, 51032, 51081, 51033, 51082, 51034, 51083, 51108, 51132, 51035, 51084, 51109, 51133, 51036, 51085, 51110, 51134, 51037, 51086, 51111, 51135, 51038, 51087, 51112, 51136, 51039, 51040, 51041, 51042, 51043, 51044, 51088, 51113, 51137, 51045, 51089, 51114, 51138, 51046, 51090, 51115, 51139, 51047, 51091, 51116, 51164, 51092, 51117, 51141, 51165, 51049, 51050, 51051, 51052, 51053, 51055, 51094, 51119, 51143, 51167, 51056, 51095, 51120, 51144, 51168, 51057, 51096, 51121, 51145];
 /* 👆 TODOS TUS IDs CARGADOS 👆 */
 
 const coloresPastel=['#ffffff', '#fcfcfc'];
@@ -61,96 +61,6 @@ function configurarColorAcceso(pAcceso) {
         return '#27ae60'; 
     }
     return '#27ae60'; 
-}
-
-/* 🛡️ RASTREADOR DE FOROS INTELIGENTE MUTLI-CAPA CORREGIDO 🛡️ */
-async function verificarEstadoForo(col, courseId, pNombre, pId, dCurso) {
-    if (!col.urlDirecta) return "⚠️ Sin link";
-    
-    let matchId = col.urlDirecta.match(/id=(\d+)/);
-    if (!matchId) return "⚠️ Sin link";
-    let cmid = matchId[1];
-    
-    try {
-        // --- CAPA 1: Escaneo superficial directo de la portada del foro ---
-        let resForum = await fetch(col.urlDirecta);
-        let htmlText = await resForum.text();
-        let dForum = new DOMParser().parseFromString(htmlText, "text/html");
-        
-        let regionContenido = dForum.querySelector('#region-main, .forumsearch, table.forumreport, .discussion-list');
-        let contenidoABuscar = regionContenido ? regionContenido.innerHTML.toLowerCase() : htmlText.toLowerCase();
-        
-        if (pId && contenidoABuscar.includes(`id=${pId}`)) {
-            return "✅ Sí";
-        }
-        
-        let profMin = pNombre.toLowerCase();
-        let partesNombre = profMin.split(' ').filter(p => p.length > 2);
-        if (partesNombre.length > 0) {
-            let textSimple = regionContenido ? regionContenido.textContent.toLowerCase() : htmlText.toLowerCase();
-            let matches = partesNombre.filter(p => textSimple.includes(p));
-            if (matches.length >= 2) {
-                return "✅ Sí"; 
-            }
-        }
-
-        // --- CAPA 2: Reporte Resumido de Foros de Moodle (Precisión Absoluta) ---
-        let urlSummary = `https://e-campus.uniacc.cl/mod/forum/report/summary/index.php?id=${cmid}&perpage=200`;
-        let resSummary = await fetch(urlSummary);
-        if (resSummary.ok) {
-            let htmlSummary = await resSummary.text();
-            if (htmlSummary.includes("reportsummary-table") || htmlSummary.includes("<table")) {
-                let dSummary = new DOMParser().parseFromString(htmlSummary, "text/html");
-                let tabla = dSummary.querySelector('.reportsummary-table, table');
-                if (tabla) {
-                    let filas = tabla.querySelectorAll('tbody tr');
-                    for (let row of filas) {
-                        let rowHTML = row.innerHTML;
-                        let rowText = row.textContent.toLowerCase();
-                        let esRenglonProfesor = false;
-                        
-                        if (pId && rowHTML.includes(`id=${pId}`)) {
-                            esRenglonProfesor = true;
-                        } else if (partesNombre.length > 0) {
-                            let matches = partesNombre.filter(p => rowText.includes(p));
-                            if (matches.length >= 2) esRenglonProfesor = true;
-                        }
-                        
-                        if (esRenglonProfesor) {
-                            let celdas = row.cells;
-                            let totalActividad = 0;
-                            for (let c = 1; c < celdas.length; c++) {
-                                let num = parseInt(celdas[c].textContent.replace(/[^\d]/g, '') || "0");
-                                if (!isNaN(num)) totalActividad += num;
-                            }
-                            return totalActividad > 0 ? "✅ Sí" : "❌ No";
-                        }
-                    }
-                }
-            }
-        }
-        
-        // --- CAPA 3: Búsqueda Indexada Global de Aportes en el Aula ---
-        let urlSearch = `https://e-campus.uniacc.cl/mod/forum/search.php?id=${courseId}&search=${encodeURIComponent(pNombre)}`;
-        let resSearch = await fetch(urlSearch);
-        if (resSearch.ok) {
-            let htmlSearch = await resSearch.text();
-            let dSearch = new DOMParser().parseFromString(htmlSearch, "text/html");
-            let centroBusqueda = dSearch.querySelector('#region-main, #maincontent, .forumsearch');
-            if (centroBusqueda) {
-                let enlaces = centroBusqueda.querySelectorAll(`a[href*="view.php?id=${cmid}"]`);
-                if (enlaces.length > 0) {
-                    return "✅ Sí";
-                }
-            }
-        }
-
-        return "❌ No";
-        
-    } catch (e) {
-        console.error("Error validando foro en cmid " + cmid, e);
-        return "⚠️ Error";
-    }
 }
 
 function iniciarPanelUI(){
@@ -551,6 +461,107 @@ async function ejecutarExtractor(estudianteObjetivo){
     }
     
     renderTabla();
+}
+
+/* 👇 EXACTA LÓGICA DE FOROS DE TU ARCHIVO 👇 */
+async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
+    let urlForoObjetivo=col.urlDirecta&&(col.urlDirecta.includes("mod/forum/view.php")||col.urlDirecta.includes("mod/forum/discuss.php"))?col.urlDirecta:null;
+    if(!urlForoObjetivo || !urlForoObjetivo.includes("forum")){
+        try{
+            let numsCol = normalizarTexto(col.nom).match(/\d+/g) || [];
+            let dCurso = dCursoPreload; 
+            let secciones = dCurso.querySelectorAll('#accordionEx1 > .card, .course-content .section');
+            let forosCandidatos = [];
+
+            secciones.forEach(seccion => {
+                let header = seccion.querySelector('.card-header h5, .sectionname');
+                let tituloSeccion = header ? normalizarTexto(header.textContent) : '';
+                let numsSeccion = tituloSeccion.match(/\d+/g) || [];
+
+                let numeroCoincide = true;
+                if (numsCol.length > 0 && numsSeccion.length > 0) numeroCoincide = numsCol.some(n => numsSeccion.includes(n));
+
+                if (numeroCoincide) {
+                    let enlacesForo = seccion.querySelectorAll('a[href*="/mod/forum/view.php"], a[href*="/mod/forum/discuss.php"]');
+                    enlacesForo.forEach(enlace => {
+                        let tituloForo = normalizarTexto(enlace.textContent);
+                        if (!tituloForo.includes("ad a traves") && !tituloForo.includes("ad ") && !tituloForo.includes("diagnostica") && !tituloForo.includes("duda") && !tituloForo.includes("aviso") && !tituloForo.includes("presenta")) {
+                            forosCandidatos.push({
+                                href: enlace.href,
+                                esSalaDeClases: tituloForo.includes("sala de clase") || tituloForo.includes("evaluado")
+                            });
+                        }
+                    });
+                }
+            });
+
+            let mejorCandidato = forosCandidatos.find(f => f.esSalaDeClases);
+            if (mejorCandidato) urlForoObjetivo = mejorCandidato.href;
+            else if (forosCandidatos.length > 0) urlForoObjetivo = forosCandidatos[0].href;
+        }catch(e){console.error("Error al rastrear unidad", e)}
+    }
+    
+    if(!urlForoObjetivo) return "<span style='color:#d35400;'>⚠️ No link</span>";
+    let linkDebug = `<br><a href="${urlForoObjetivo}" target="_blank" style="font-size:10px;color:#3498db;text-decoration:none;">🔗 Ver foro</a>`;
+
+    try{
+        let rForo=await fetch(urlForoObjetivo);
+        let rawHtmlForo = await rForo.text();
+        let profeEncontrado = false;
+        let estudiantes = new Set();
+
+        if (pId && (rawHtmlForo.includes(`id=${pId}&`) || rawHtmlForo.includes(`id=${pId}"`) || rawHtmlForo.includes(`userid":${pId}`) || rawHtmlForo.includes(`userid":"${pId}"`))) profeEncontrado = true;
+
+        let dForo = new DOMParser().parseFromString(rawHtmlForo,"text/html");
+        function escanearDoc(doc) {
+            doc.querySelectorAll('aside, nav, header, footer, #block-region-side-pre, #block-region-side-post, .block, .navbar').forEach(el => el.remove());
+            let main = doc.querySelector('#region-main, [role="main"], #maincontent, .course-content') || doc.body;
+
+            if(pId && main.innerHTML.includes(`id=${pId}`)) profeEncontrado = true;
+
+            doc.querySelectorAll('.forumpost, article.forum-post, tr.discussion, .discussion-list-item, td.author, a[href*="user/view.php"]').forEach(post => {
+                let html = post.innerHTML || "";
+                if (pId && html.includes(`id=${pId}`)) profeEncontrado = true;
+
+                let imgAutor = post.querySelector('img.userpicture');
+                let linkAutor = post.tagName.toLowerCase() === 'a' ? post : post.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
+                
+                if(imgAutor || linkAutor){
+                    let n = ((linkAutor ? linkAutor.textContent : "") || (imgAutor ? imgAutor.getAttribute('alt') : "") || "").replace(/Imagen de /gi, "").trim();
+                    if(n.length > 3 && !n.toLowerCase().includes('profesor') && !n.toLowerCase().includes('docente')) estudiantes.add(n);
+                }
+            });
+        }
+        escanearDoc(dForo);
+
+        if(!profeEncontrado) {
+            let linksDebates = Array.from(dForo.querySelectorAll('a[href*="discuss.php?d="]')).map(a => a.href.split('#')[0]);
+            let linksUnicos = [...new Set(linksDebates)].slice(0, 8); 
+
+            for(let link of linksUnicos) {
+                if(profeEncontrado) break; 
+                try {
+                    let rDeb = await fetch(link);
+                    let textDeb = await rDeb.text();
+                    if (pId && (textDeb.includes(`id=${pId}`) || textDeb.includes(`userid":${pId}`) || textDeb.includes(`userid":"${pId}"`))) {
+                        profeEncontrado = true; break;
+                    }
+                    let docDeb = new DOMParser().parseFromString(textDeb, "text/html");
+                    escanearDoc(docDeb);
+                } catch(e){}
+            }
+        }
+
+        if(profeEncontrado) return `<span style='color:#27ae60;font-weight:bold;'>✅ Sí</span>${linkDebug}`;
+        
+        let arrEstudiantes = Array.from(estudiantes);
+        if(arrEstudiantes.length === 0) return `<span style='color:#c0392b;font-weight:bold;'>❌ No</span><br><small style='font-size:10px;color:#888;'>Sin discusiones</small>${linkDebug}`;
+        
+        let muestra = arrEstudiantes.slice(0, 2).join(', ');
+        if(arrEstudiantes.length > 2) muestra += '...';
+        return `<span style='color:#c0392b;font-weight:bold;'>❌ No</span><br><small style='font-size:10px;color:#888;'>Alumnos: ${muestra}</small>${linkDebug}`;
+        
+    }catch(e){return "<span style='color:#7f8c8d;'>⚠️ Error</span>";}
 }
 
 iniciarPanelUI();
