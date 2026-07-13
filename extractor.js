@@ -1,6 +1,6 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[51014, 51063, 51098];
+const ids=[53526, 53554, 52547];
 /* 👆 TODOS TUS IDs CARGADOS 👆 */
 
 const coloresPastel=['#ffffff', '#fcfcfc'];
