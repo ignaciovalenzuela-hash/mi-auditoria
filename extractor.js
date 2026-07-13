@@ -37,12 +37,19 @@ function obtenerNumeroUnidad(nombreColumna) {
     return null;
 }
 
-/* 👇 NUEVO ASIGNADOR INTELIGENTE DE UNIDADES 👇 */
-function asignarUnidad(nom, idxCol, totalUnidades) {
-    // Si la evaluación es "final", "proyecto", "examen", se ancla a la ÚLTIMA unidad detectada
-    if (/final|proyecto|integraci/i.test(nom)) return totalUnidades || 1;
+function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
+    // 1. Prioridad Máxima: Mapeo geográfico exacto (actividad -> unidad donde vive)
+    if (actId && mapaActividadUnidad[actId] && mapaActividadUnidad[actId] <= totalUnidades) {
+        return mapaActividadUnidad[actId];
+    }
+    // 2. Evaluaciones finales, proyectos o exámenes -> se anclan a la última unidad
+    if (/final|proyecto|integraci|examen/i.test(nom)) return totalUnidades || 1;
+    
+    // 3. Por número explícito en el nombre (Ej: Foro 2 -> Unidad 2)
     let numNombre = obtenerNumeroUnidad(nom);
     if (numNombre !== null && numNombre <= totalUnidades && numNombre > 0) return numNombre;
+    
+    // 4. Último descarte proporcional de seguridad
     return (idxCol !== -1 && idxCol < totalUnidades) ? idxCol + 1 : (totalUnidades || 1);
 }
 
@@ -86,7 +93,7 @@ async function ejecutarExtractor(estudianteObjetivo){
     let esBusquedaEstudiante=estudianteObjetivo!==null;
     let datosExtraidos = [];
     
-    document.body.innerHTML=`<div style='position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:9999;padding:50px;font-family:sans-serif;text-align:center;'><h2>${esBusquedaEstudiante?'🔍 Buscando estudiante...':'🚀 Extractor General Activo'}</h2><div style='width:80%;background:#eee;height:20px;margin:20px auto;border-radius:10px;overflow:hidden;'><div id='p' style='width:0%;background:#2980b9;height:100%;transition:0.3s;'></div></div><p id='s'>Mapeando fechas homologadas por Unidad...</p><p id='pct'>0%</p></div>`;
+    document.body.innerHTML=`<div style='position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:9999;padding:50px;font-family:sans-serif;text-align:center;'><h2>${esBusquedaEstudiante?'🔍 Buscando estudiante...':'🚀 Extractor General Activo'}</h2><div style='width:80%;background:#eee;height:20px;margin:20px auto;border-radius:10px;overflow:hidden;'><div id='p' style='width:0%;background:#2980b9;height:100%;transition:0.3s;'></div></div><p id='s'>Mapeando fechas y estructurando unidades...</p><p id='pct'>0%</p></div>`;
     
     for(let i=0;i<ids.length;i++){
         try{
@@ -141,24 +148,40 @@ async function ejecutarExtractor(estudianteObjetivo){
             let rCurso = await fetch(`https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}`);
             let dCurso = new DOMParser().parseFromString(await rCurso.text(), "text/html");
             
+            // 👇 MAPEO GEOGRÁFICO DE UNIDADES Y SUS ACTIVIDADES 👇
             let fechasSecuenciales = [];
-            let todosLosBloquesFechas = dCurso.querySelectorAll('.availabilityinfo, .section_availability, [data-region="availabilityinfo"], .isrestricted');
+            let mapaActividadUnidad = {}; 
+            let secciones = dCurso.querySelectorAll('#accordionEx1 > .card, .course-content li.section, .course-content .section');
             
-            todosLosBloquesFechas.forEach(el => {
-                let textoEl = el.textContent.replace(/\s+/g, ' ');
-                if (textoEl.toLowerCase().includes("disponible desde")) {
-                    let fecha = "";
-                    let strong = el.querySelector('strong');
-                    if (strong) {
-                        fecha = strong.textContent.trim();
-                    } else {
-                        let match = textoEl.match(/disponible desde\s+([a-z0-9\sde]+)/i);
-                        if (match && match[1]) fecha = match[1].trim();
-                    }
-                    if (fecha && !fechasSecuenciales.includes(fecha)) {
-                        fechasSecuenciales.push(fecha);
+            let contadorUnidadMapeada = 0;
+            secciones.forEach(sec => {
+                let textoEl = sec.querySelector('.availabilityinfo, .section_availability, [data-region="availabilityinfo"], .isrestricted');
+                let fecha = "";
+                if (textoEl) {
+                    let txt = textoEl.textContent.replace(/\s+/g, ' ');
+                    if (txt.toLowerCase().includes("disponible desde")) {
+                        let strong = textoEl.querySelector('strong');
+                        if (strong) {
+                            fecha = strong.textContent.trim();
+                        } else {
+                            let match = txt.match(/disponible desde\s+([a-z0-9\sde]+)/i);
+                            if (match && match[1]) fecha = match[1].trim();
+                        }
                     }
                 }
+                
+                if (fecha && !fechasSecuenciales.includes(fecha)) {
+                    fechasSecuenciales.push(fecha);
+                }
+                
+                // Mantiene agrupada a la actividad bajo la unidad de fecha más reciente detectada
+                contadorUnidadMapeada = fechasSecuenciales.length; 
+                let unidadAsignadaSec = contadorUnidadMapeada > 0 ? contadorUnidadMapeada : 1;
+                
+                sec.querySelectorAll('a[href*="/mod/"]').forEach(a => {
+                    let m = a.href.match(/id=(\d+)/);
+                    if (m) mapaActividadUnidad[m[1]] = unidadAsignadaSec;
+                });
             });
 
             if (fechasSecuenciales.length === 0) {
@@ -172,9 +195,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                                 let match = txt.match(/disponible desde\s+([a-z0-9\sde]+)/i);
                                 if (match && match[1]) fecha = match[1].trim();
                             }
-                            if (fecha && !fechasSecuenciales.includes(fecha)) {
-                                fechasSecuenciales.push(fecha);
-                            }
+                            if (fecha && !fechasSecuenciales.includes(fecha)) fechasSecuenciales.push(fecha);
                         }
                     }
                 });
@@ -182,12 +203,10 @@ async function ejecutarExtractor(estudianteObjetivo){
 
             let arregloUnidades = [];
             for (let idx = 0; idx < fechasSecuenciales.length; idx++) {
-                let inicio = fechasSecuenciales[idx];
-                let termino = (idx + 1 < fechasSecuenciales.length) ? fechasSecuenciales[idx + 1] : "Cierre del curso";
                 arregloUnidades.push({
                     numeroUnidad: idx + 1,
-                    inicio: inicio,
-                    termino: termino
+                    inicio: fechasSecuenciales[idx],
+                    termino: (idx + 1 < fechasSecuenciales.length) ? fechasSecuenciales[idx + 1] : "Cierre del curso"
                 });
             }
             
@@ -197,7 +216,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                 Array.from(filaMaestra.cells).forEach((celda,idx)=>{
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
                     let nomMin=nom.toLowerCase();
-                    // 👇 SE AMPLIÓ EL FILTRO PARA ATRAPAR ACTIVIDADES FINALES 👇
                     if(/foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin) && !/total|promedio|ad:|diagnostica|diagnóstica/i.test(nomMin)){
                         let linkActividad=celda.querySelector('a[href*="mod/"]');
                         let actId = null;
@@ -222,7 +240,9 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let statusForo="No aplica";
                             if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
                             
-                            let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length);
+                            // 👇 UTILIZA EL MAPEO GEOGRÁFICO PARA ASIGNAR UNIDAD EXACTA 👇
+                            let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
+
                             let fechasStr = "No especificada";
                             if (arregloUnidades[unidadAsignada - 1]) {
                                 let uObj = arregloUnidades[unidadAsignada - 1];
@@ -248,7 +268,9 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let statusForo="No aplica";
                             if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
                             
-                            let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length);
+                            // 👇 UTILIZA EL MAPEO GEOGRÁFICO PARA ASIGNAR UNIDAD EXACTA 👇
+                            let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
+
                             let fechasStr = "No especificada";
                             let textoTermino = "Cierre del curso";
                             if (arregloUnidades[unidadAsignada - 1]) {
@@ -453,7 +475,7 @@ async function ejecutarExtractor(estudianteObjetivo){
     renderTabla();
 }
 
-/* 👇 EXACTA LÓGICA DE FOROS DE TU ARCHIVO 👇 */
+/* 👇 LÓGICA INFALIBLE DE FOROS PROPORCIONADA ORIGINALMENTE 👇 */
 async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
     let urlForoObjetivo=col.urlDirecta&&(col.urlDirecta.includes("mod/forum/view.php")||col.urlDirecta.includes("mod/forum/discuss.php"))?col.urlDirecta:null;
     if(!urlForoObjetivo || !urlForoObjetivo.includes("forum")){
