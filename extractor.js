@@ -1,6 +1,6 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[51014, 51063, 51098];
+const ids=[51014, 51063, 51098, 51122, 51181, 53631, 51015, 51064, 51099, 51123, 51147, 53632, 51016, 51065, 51100, 51148, 51183, 53633, 51017, 51066, 51101, 51125, 51149, 53634, 51018, 51067, 51150, 51174, 51185, 53635, 51019, 51020, 51021, 51022, 51023, 51024, 51073, 51103, 51151, 51175, 51025, 51074, 51104, 51128, 51152, 51026, 51075, 51105, 51153, 51177, 51027, 51106, 51130, 51154, 51178, 51028, 51077, 51107, 51131, 51155, 51029, 51078, 51030, 51079, 51031, 51080, 51032, 51081, 51033, 51082, 51034, 51083, 51108, 51132, 51035, 51084, 51109, 51133, 51036, 51085, 51110, 51134, 51037, 51086, 51111, 51135, 51038, 51087, 51112, 51136, 51039, 51040, 51041, 51042, 51043, 51044, 51088, 51113, 51137, 51045, 51089, 51114, 51138, 51046, 51090, 51115, 51139, 51047, 51091, 51116, 51164, 51092, 51117, 51141, 51165, 51049, 51050, 51051, 51052, 51053, 51055, 51094, 51119, 51143, 51167, 51056, 51095, 51120, 51144, 51168, 51057, 51096, 51121, 51145];
 /* 👆 TODOS TUS IDs CARGADOS 👆 */
 
 const coloresPastel=['#ffffff', '#fcfcfc'];
@@ -35,6 +35,15 @@ function obtenerNumeroUnidad(nombreColumna) {
     if (/\bii\b/.test(texto)) return 2;
     if (/\bi\b/.test(texto)) return 1;
     return null;
+}
+
+/* 👇 NUEVO ASIGNADOR INTELIGENTE DE UNIDADES 👇 */
+function asignarUnidad(nom, idxCol, totalUnidades) {
+    // Si la evaluación es "final", "proyecto", "examen", se ancla a la ÚLTIMA unidad detectada
+    if (/final|proyecto|integraci/i.test(nom)) return totalUnidades || 1;
+    let numNombre = obtenerNumeroUnidad(nom);
+    if (numNombre !== null && numNombre <= totalUnidades && numNombre > 0) return numNombre;
+    return (idxCol !== -1 && idxCol < totalUnidades) ? idxCol + 1 : (totalUnidades || 1);
 }
 
 function obtenerColorRendimiento(pct, textoTermino) {
@@ -188,7 +197,8 @@ async function ejecutarExtractor(estudianteObjetivo){
                 Array.from(filaMaestra.cells).forEach((celda,idx)=>{
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
                     let nomMin=nom.toLowerCase();
-                    if(/foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario/i.test(nomMin) && !/total|promedio|ad:|diagnostica|diagnóstica/i.test(nomMin)){
+                    // 👇 SE AMPLIÓ EL FILTRO PARA ATRAPAR ACTIVIDADES FINALES 👇
+                    if(/foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin) && !/total|promedio|ad:|diagnostica|diagnóstica/i.test(nomMin)){
                         let linkActividad=celda.querySelector('a[href*="mod/"]');
                         let actId = null;
                         if (linkActividad) {
@@ -212,17 +222,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let statusForo="No aplica";
                             if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
                             
-                            let unidadAsignada = null;
-                            let numNombre = obtenerNumeroUnidad(col.nom);
-                            
-                            if (numNombre !== null && numNombre <= arregloUnidades.length && numNombre > 0) {
-                                unidadAsignada = numNombre;
-                            }
-                            if (!unidadAsignada) {
-                                let idxCol = colValidas.indexOf(col);
-                                unidadAsignada = (idxCol !== -1 && idxCol < arregloUnidades.length) ? idxCol + 1 : (arregloUnidades.length || 1);
-                            }
-
+                            let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length);
                             let fechasStr = "No especificada";
                             if (arregloUnidades[unidadAsignada - 1]) {
                                 let uObj = arregloUnidades[unidadAsignada - 1];
@@ -248,17 +248,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let statusForo="No aplica";
                             if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
                             
-                            let unidadAsignada = null;
-                            let numNombre = obtenerNumeroUnidad(col.nom);
-                            
-                            if (numNombre !== null && numNombre <= arregloUnidades.length && numNombre > 0) {
-                                unidadAsignada = numNombre;
-                            }
-                            if (!unidadAsignada) {
-                                let idxCol = colValidas.indexOf(col);
-                                unidadAsignada = (idxCol !== -1 && idxCol < arregloUnidades.length) ? idxCol + 1 : (arregloUnidades.length || 1);
-                            }
-
+                            let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length);
                             let fechasStr = "No especificada";
                             let textoTermino = "Cierre del curso";
                             if (arregloUnidades[unidadAsignada - 1]) {
@@ -449,7 +439,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                         html += `<td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}font-size:11px;'>${it.fechasStr}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}'>${it.colNom}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${it.statusForo}</td>
-                                 <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;color:#c0392b;'>${it.faltan}</td>
+                                 <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;color:${it.faltan>0?"#c0392b":"#27ae60"};'>${it.faltan}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${it.totalAlumnos}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;background-color:${bgRendimiento};'>${it.rendimiento}%</td>
                                  </tr>`;
