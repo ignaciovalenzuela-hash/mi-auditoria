@@ -1,6 +1,6 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[51014, 51063, 51098,];
+const ids=[51014, 51063];
 /* 👆 TODOS TUS IDs CARGADOS 👆 */
 
 const coloresPastel=['#ffffff', '#fcfcfc'];
@@ -63,36 +63,92 @@ function configurarColorAcceso(pAcceso) {
     return '#27ae60'; 
 }
 
+/* 🛡️ RASTREADOR DE FOROS INTELIGENTE MUTLI-CAPA CORREGIDO 🛡️ */
 async function verificarEstadoForo(col, courseId, pNombre, pId, dCurso) {
     if (!col.urlDirecta) return "⚠️ Sin link";
+    
+    let matchId = col.urlDirecta.match(/id=(\d+)/);
+    if (!matchId) return "⚠️ Sin link";
+    let cmid = matchId[1];
+    
     try {
-        let res = await fetch(col.urlDirecta);
-        let htmlText = await res.text();
+        // --- CAPA 1: Escaneo superficial directo de la portada del foro ---
+        let resForum = await fetch(col.urlDirecta);
+        let htmlText = await resForum.text();
         let dForum = new DOMParser().parseFromString(htmlText, "text/html");
         
-        let textMin = htmlText.toLowerCase();
-        let profMin = pNombre.toLowerCase();
-        
         let regionContenido = dForum.querySelector('#region-main, .forumsearch, table.forumreport, .discussion-list');
-        let contenidoABuscar = regionContenido ? regionContenido.textContent.toLowerCase() : textMin;
+        let contenidoABuscar = regionContenido ? regionContenido.innerHTML.toLowerCase() : htmlText.toLowerCase();
         
+        if (pId && contenidoABuscar.includes(`id=${pId}`)) {
+            return "✅ Sí";
+        }
+        
+        let profMin = pNombre.toLowerCase();
         let partesNombre = profMin.split(' ').filter(p => p.length > 2);
-        let controlDePresencia = false;
-        
-        if (pId && textMin.includes(`user/view.php?id=${pId}`)) {
-            if (regionContenido && regionContenido.innerHTML.includes(`id=${pId}`)) {
-                controlDePresencia = true;
-            }
-        }
-        if (!controlDePresencia && partesNombre.length > 0) {
-            let matches = partesNombre.filter(p => contenidoABuscar.includes(p));
+        if (partesNombre.length > 0) {
+            let textSimple = regionContenido ? regionContenido.textContent.toLowerCase() : htmlText.toLowerCase();
+            let matches = partesNombre.filter(p => textSimple.includes(p));
             if (matches.length >= 2) {
-                controlDePresencia = true;
+                return "✅ Sí"; 
             }
         }
-        return controlDePresencia ? "✅ Sí" : "❌ No";
+
+        // --- CAPA 2: Reporte Resumido de Foros de Moodle (Precisión Absoluta) ---
+        let urlSummary = `https://e-campus.uniacc.cl/mod/forum/report/summary/index.php?id=${cmid}&perpage=200`;
+        let resSummary = await fetch(urlSummary);
+        if (resSummary.ok) {
+            let htmlSummary = await resSummary.text();
+            if (htmlSummary.includes("reportsummary-table") || htmlSummary.includes("<table")) {
+                let dSummary = new DOMParser().parseFromString(htmlSummary, "text/html");
+                let tabla = dSummary.querySelector('.reportsummary-table, table');
+                if (tabla) {
+                    let filas = tabla.querySelectorAll('tbody tr');
+                    for (let row of filas) {
+                        let rowHTML = row.innerHTML;
+                        let rowText = row.textContent.toLowerCase();
+                        let esRenglonProfesor = false;
+                        
+                        if (pId && rowHTML.includes(`id=${pId}`)) {
+                            esRenglonProfesor = true;
+                        } else if (partesNombre.length > 0) {
+                            let matches = partesNombre.filter(p => rowText.includes(p));
+                            if (matches.length >= 2) esRenglonProfesor = true;
+                        }
+                        
+                        if (esRenglonProfesor) {
+                            let celdas = row.cells;
+                            let totalActividad = 0;
+                            for (let c = 1; c < celdas.length; c++) {
+                                let num = parseInt(celdas[c].textContent.replace(/[^\d]/g, '') || "0");
+                                if (!isNaN(num)) totalActividad += num;
+                            }
+                            return totalActividad > 0 ? "✅ Sí" : "❌ No";
+                        }
+                    }
+                }
+            }
+        }
+        
+        // --- CAPA 3: Búsqueda Indexada Global de Aportes en el Aula ---
+        let urlSearch = `https://e-campus.uniacc.cl/mod/forum/search.php?id=${courseId}&search=${encodeURIComponent(pNombre)}`;
+        let resSearch = await fetch(urlSearch);
+        if (resSearch.ok) {
+            let htmlSearch = await resSearch.text();
+            let dSearch = new DOMParser().parseFromString(htmlSearch, "text/html");
+            let centroBusqueda = dSearch.querySelector('#region-main, #maincontent, .forumsearch');
+            if (centroBusqueda) {
+                let enlaces = centroBusqueda.querySelectorAll(`a[href*="view.php?id=${cmid}"]`);
+                if (enlaces.length > 0) {
+                    return "✅ Sí";
+                }
+            }
+        }
+
+        return "❌ No";
+        
     } catch (e) {
-        console.error("Error validando foro", e);
+        console.error("Error validando foro en cmid " + cmid, e);
         return "⚠️ Error";
     }
 }
