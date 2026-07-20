@@ -2,13 +2,35 @@
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
 const ids=[52547,53519,53736,53524,53802,53525,53535,53157,53161,53166,52429,52087,53526,53536,51266,52122,53673,53527,53537,53554,52581,52575,53520,53528,53158,51730,51719,51720,53529,53538,53521,53530,53539,53562,53159,53162,52552,50920,53522,53531,53540,53549,53556,51517,51274,53523,53532,53550,52750,53163,50919,50921,53533,53542,51581,53164,52751,52607,52752,52428,52559,53683,53534,53543,53552,53803];
 /* 👆 TODOS TUS IDs CARGADOS 👆 */
-
 const coloresPastel=['#ffffff', '#fcfcfc'];
+
+// --- NUEVA FUNCIÓN PARA MODAL DE ESTUDIANTES ---
+window.mostrarEstudiantesSinNota = function(datosCodificados) {
+    let estudiantes = decodeURIComponent(datosCodificados).split('||');
+    let listaHtml = estudiantes.map(e => `<li style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">👤 ${e}</li>`).join('');
+    let div = document.createElement('div');
+    div.id = "modal-estudiantes-faltantes";
+    div.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:100000;display:flex;justify-content:center;align-items:center;";
+    div.innerHTML = `
+        <div style="background:white;padding:25px;border-radius:10px;width:400px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,0.3);font-family:sans-serif;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <h3 style="margin:0;color:#c0392b;">Estudiantes sin calificar</h3>
+                <button onclick="document.getElementById('modal-estudiantes-faltantes').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#7f8c8d;font-weight:bold;">&times;</button>
+            </div>
+            <div style="overflow-y:auto;flex-grow:1;border:1px solid #ecf0f1;padding:10px;border-radius:6px;background:#f9fbfc;">
+                <ul style="list-style:none;padding:0;margin:0;font-size:13px;color:#2c3e50;">
+                    ${listaHtml}
+                </ul>
+            </div>
+            <button onclick="document.getElementById('modal-estudiantes-faltantes').remove()" style="margin-top:15px;padding:10px;background:#34495e;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">Cerrar Ventana</button>
+        </div>
+    `;
+    document.body.appendChild(div);
+};
 
 function normalizarTexto(t){
     return t?t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim():"";
 }
-
 function parsearFechaMoodle(texto) {
     if (!texto || /cierre/i.test(texto)) return null;
     let t = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -23,7 +45,6 @@ function parsearFechaMoodle(texto) {
     let anio = matchAnio ? parseInt(matchAnio[1]) : new Date().getFullYear();
     return new Date(anio, mesIdx, dia);
 }
-
 function obtenerNumeroUnidad(nombreColumna) {
     let texto = normalizarTexto(nombreColumna);
     let numeros = texto.match(/\d+/g);
@@ -36,23 +57,15 @@ function obtenerNumeroUnidad(nombreColumna) {
     if (/\bi\b/.test(texto)) return 1;
     return null;
 }
-
 function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
-    // 1. Prioridad Máxima: Mapeo geográfico exacto (actividad -> unidad donde vive)
     if (actId && mapaActividadUnidad[actId] && mapaActividadUnidad[actId] <= totalUnidades) {
         return mapaActividadUnidad[actId];
     }
-    // 2. Evaluaciones finales, proyectos o exámenes -> se anclan a la última unidad
     if (/final|proyecto|integraci|examen/i.test(nom)) return totalUnidades || 1;
-    
-    // 3. Por número explícito en el nombre (Ej: Foro 2 -> Unidad 2)
     let numNombre = obtenerNumeroUnidad(nom);
     if (numNombre !== null && numNombre <= totalUnidades && numNombre > 0) return numNombre;
-    
-    // 4. Último descarte proporcional de seguridad
     return (idxCol !== -1 && idxCol < totalUnidades) ? idxCol + 1 : (totalUnidades || 1);
 }
-
 function obtenerColorRendimiento(pct, textoTermino) {
     let ahora = new Date();
     let fechaTermino = parsearFechaMoodle(textoTermino);
@@ -66,7 +79,6 @@ function obtenerColorRendimiento(pct, textoTermino) {
     if (pct < 90) return '#fdebd0';  
     return '#e8f8f5';               
 }
-
 function configurarColorAcceso(pAcceso) {
     let txt = pAcceso.toLowerCase();
     if (/nunca|mes|año/i.test(txt)) return '#c0392b'; 
@@ -78,7 +90,6 @@ function configurarColorAcceso(pAcceso) {
     }
     return '#27ae60'; 
 }
-
 function iniciarPanelUI(){
     document.body.innerHTML=`<div id="panel-auditoria" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(245,247,250,0.98);z-index:9999;display:flex;justify-content:center;align-items:center;font-family:sans-serif;overflow-y:auto;"><div style="background:white;padding:35px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1);text-align:center;width:480px;border:1px solid #e1e8ed;max-height:95vh;overflow-y:auto;"><h2 style="background:linear-gradient(135deg,#cc609b,#ff89c9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;color:#cc609b;margin:0 0 10px 0;font-size:26px;font-weight:bold;letter-spacing:-0.5px;">Revisor eCampus (Láser Consolidado)</h2><p style="color:#555;font-size:15px;margin:0 0 20px 0;font-weight:bold;">¿Qué deseas hacer?</p><button id="btnGeneral" style="width:100%;background:#27ae60;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;margin-bottom:20px;transition:0.2s;">🚀 Auditoría General</button><div style="border-top:2px dashed #e1e8ed;margin:20px 0;"></div><h3 style="color:#7f8c8d;font-size:14px;margin-bottom:12px;text-align:left;font-weight:bold;">🔍 Búsqueda Rápida por Estudiante:</h3><input type="email" id="correoEstudiante" placeholder="Correo exacto del alumno" style="width:100%;padding:11px;box-sizing:border-box;border:2px solid #bdc3c7;border-radius:8px;font-size:13px;margin-bottom:15px;outline:none;"><button id="btnEstudiante" style="width:100%;background:#2980b9;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;transition:0.2s;">👤 Buscar en Todas las Aulas</button></div></div>`;
     document.getElementById('btnGeneral').addEventListener('click',()=>ejecutarExtractor(null));
@@ -88,7 +99,6 @@ function iniciarPanelUI(){
         ejecutarExtractor(correo);
     });
 }
-
 async function ejecutarExtractor(estudianteObjetivo){
     let esBusquedaEstudiante=estudianteObjetivo!==null;
     let datosExtraidos = [];
@@ -144,11 +154,9 @@ async function ejecutarExtractor(estudianteObjetivo){
                     }
                 }
             }
-
             let rCurso = await fetch(`https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}`);
             let dCurso = new DOMParser().parseFromString(await rCurso.text(), "text/html");
             
-            // 👇 MAPEO GEOGRÁFICO DE UNIDADES Y SUS ACTIVIDADES 👇
             let fechasSecuenciales = [];
             let mapaActividadUnidad = {}; 
             let secciones = dCurso.querySelectorAll('#accordionEx1 > .card, .course-content li.section, .course-content .section');
@@ -174,7 +182,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                     fechasSecuenciales.push(fecha);
                 }
                 
-                // Mantiene agrupada a la actividad bajo la unidad de fecha más reciente detectada
                 contadorUnidadMapeada = fechasSecuenciales.length; 
                 let unidadAsignadaSec = contadorUnidadMapeada > 0 ? contadorUnidadMapeada : 1;
                 
@@ -183,7 +190,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                     if (m) mapaActividadUnidad[m[1]] = unidadAsignadaSec;
                 });
             });
-
             if (fechasSecuenciales.length === 0) {
                 dCurso.querySelectorAll('div, span, p, li, strong').forEach(el => {
                     if (el.children.length === 0 || (el.children.length === 1 && el.querySelector('strong'))) {
@@ -200,7 +206,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                     }
                 });
             }
-
             let arregloUnidades = [];
             for (let idx = 0; idx < fechasSecuenciales.length; idx++) {
                 arregloUnidades.push({
@@ -240,15 +245,12 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let statusForo="No aplica";
                             if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
                             
-                            // 👇 UTILIZA EL MAPEO GEOGRÁFICO PARA ASIGNAR UNIDAD EXACTA 👇
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
-
                             let fechasStr = "No especificada";
                             if (arregloUnidades[unidadAsignada - 1]) {
                                 let uObj = arregloUnidades[unidadAsignada - 1];
                                 fechasStr = `<b>Inicio:</b> ${uObj.inicio}<br><b>Término:</b> ${uObj.termino}`;
                             }
-
                             cursoObj.items.push({ colNom: col.nom, statusForo, notaTexto, fechasStr });
                         }
                         if(cursoObj.items.length > 0) datosExtraidos.push(cursoObj);
@@ -257,20 +259,25 @@ async function ejecutarExtractor(estudianteObjetivo){
                     let filasAImprimir = [];
                     for(let col of colValidas){
                         let faltan=0,totalAlumnos=0;
+                        let estudiantesSinNota = []; 
                         filasDatos.forEach(row=>{
-                            if(row.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]')){
+                            let linkEstudiante = row.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
+                            if(linkEstudiante){
                                 totalAlumnos++;
                                 let nota=parseFloat((row.cells[col.idx]?.textContent||"").replace(/[^\d,\.-]/g,'').replace(',','.'));
-                                if(isNaN(nota)||nota<1.0||nota>7.0)faltan++;
+                                if(isNaN(nota)||nota<1.0||nota>7.0){
+                                    faltan++;
+                                    let clonEst = linkEstudiante.cloneNode(true);
+                                    clonEst.querySelectorAll('.userinitials, .initials, .sr-only, .accesshide').forEach(el => el.remove());
+                                    estudiantesSinNota.push((clonEst.textContent||"").replace(/\s+/g,' ').trim());
+                                }
                             }
                         });
                         if(totalAlumnos>0){
                             let statusForo="No aplica";
                             if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
                             
-                            // 👇 UTILIZA EL MAPEO GEOGRÁFICO PARA ASIGNAR UNIDAD EXACTA 👇
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
-
                             let fechasStr = "No especificada";
                             let textoTermino = "Cierre del curso";
                             if (arregloUnidades[unidadAsignada - 1]) {
@@ -278,11 +285,11 @@ async function ejecutarExtractor(estudianteObjetivo){
                                 fechasStr = `<b>Inicio:</b> ${uObj.inicio}<br><b>Término:</b> ${uObj.termino}`;
                                 textoTermino = uObj.termino;
                             }
-
                             filasAImprimir.push({
                                 colNom: col.nom, statusForo: statusForo, faltan: faltan,
                                 totalAlumnos: totalAlumnos, rendimiento: Math.round((totalAlumnos-faltan)/totalAlumnos*100),
-                                fechasStr: fechasStr, textoTermino: textoTermino
+                                fechasStr: fechasStr, textoTermino: textoTermino,
+                                estudiantesSinNota: estudiantesSinNota 
                             });
                         }
                     }
@@ -290,7 +297,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                     if(filasAImprimir.length > 0) {
                         let cAcceso = configurarColorAcceso(pAcceso);
                         let cursoObj = { nombreCurso, pNombre, pCorreo, pAcceso, cAcceso, items: filasAImprimir };
-
                         let cursoFaltanNotas = filasAImprimir.some(item => {
                             if(item.faltan === 0) return false;
                             let fTermino = parsearFechaMoodle(item.textoTermino);
@@ -300,7 +306,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                             }
                             return true;
                         });
-
                         let cursoFaltaForo = filasAImprimir.some(item => item.statusForo.includes('❌ No'));
                         
                         let accMinText = pAcceso.toLowerCase();
@@ -310,24 +315,41 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let numDias = parseInt(accMinText.match(/\d+/)?.[0] || 0);
                             if (numDias >= 7) sinAcceso7Dias = true;
                         }
+                        
+                        let textoExplicacionCeros = "En caso de haber revisado todos los trabajos, y que aun falten notas, es porque debe ingresar el 1,0 a aquellos estudiantes que no hayan entregado la evaluación. Esto se puede hacer a través de la rúbrica (marcando todos los puntajes mínimos) o editando el libro de calificaciones e ingresando directamente el 1,0 en aquellas casillas vacías.";
+
+                        // 👇 NUEVO: CUADRO SOBRIO DE ESTUDIANTES FALTANTES PARA EL CORREO 👇
+                        let detalleFaltantesTexto = "";
+                        let evalsFaltantes = filasAImprimir.filter(item => item.faltan > 0);
+                        if(evalsFaltantes.length > 0) {
+                            detalleFaltantesTexto = "\n\n=========================================\n  DETALLE DE ESTUDIANTES SIN CALIFICAR\n=========================================\n";
+                            evalsFaltantes.forEach(ev => {
+                                detalleFaltantesTexto += `\nEvaluación: ${ev.colNom}\n`;
+                                ev.estudiantesSinNota.forEach(est => {
+                                    detalleFaltantesTexto += ` - ${est}\n`;
+                                });
+                            });
+                            detalleFaltantesTexto += "\n=========================================";
+                        }
 
                         let arrayBotones = [];
                         let listaPendientesMaestra = [];
-
                         if(sinAcceso7Dias) listaPendientesMaestra.push("- Regularizar su acceso a la plataforma (registra alerta de inactividad).");
                         if(cursoFaltaForo) listaPendientesMaestra.push("- Participación, respuesta o moderación en los foros de discusión.");
                         if(cursoFaltanNotas) listaPendientesMaestra.push("- Ingreso de calificaciones pendientes en el libro de notas (plazo de una semana cumplido).");
-
+                        
                         if(listaPendientesMaestra.length > 0 && pCorreo.includes('@')) {
                             let subjTodo = encodeURIComponent(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
-                            let bodyTodo = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}\n\nLe recordamos la importancia de mantener estas actividades al día para el correcto seguimiento de nuestros estudiantes.\n\nQuedo atento/a ante cualquier duda o inconveniente técnico.\n\nSaludos cordiales.`);
+                            // Se inyecta el detalleFaltantesTexto al final
+                            let extraText = cursoFaltanNotas ? `\n\n${textoExplicacionCeros}${detalleFaltantesTexto}` : '';
+                            let bodyTodo = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}${extraText}\n\nLe recordamos la importancia de mantener estas actividades al día para el correcto seguimiento de nuestros estudiantes.\n\nQuedo atento/a ante cualquier duda o inconveniente técnico.\n\nSaludos cordiales.`);
                             arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjTodo}&body=${bodyTodo}" style="display:inline-block;width:100px;padding:6px;background:#34495e;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;border:1px solid #2c3e50;">✉️ Todo Pendiente</a>`);
                             arrayBotones.push(`<div style="height:4px; border-bottom:1px dashed #ccc; margin-bottom:4px;"></div>`);
                         }
-
                         if(cursoFaltanNotas && pCorreo.includes('@')) {
                             let subjNotas = encodeURIComponent(`Pendiente ingreso de calificaciones - ${nombreCurso}`);
-                            let bodyNotas = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que existen calificaciones pendientes por ingresar en la asignatura ${nombreCurso}.\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
+                            // Se inyecta el detalleFaltantesTexto al final
+                            let bodyNotas = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que existen calificaciones pendientes por ingresar en la asignatura ${nombreCurso}.\n\n${textoExplicacionCeros}${detalleFaltantesTexto}\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
                             arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjNotas}&body=${bodyNotas}" style="display:inline-block;width:100px;padding:6px;background:#e67e22;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;">✉️ Faltan Notas</a>`);
                         }
                         if(cursoFaltaForo && pCorreo.includes('@')) {
@@ -353,7 +375,6 @@ async function ejecutarExtractor(estudianteObjetivo){
         document.body.innerHTML=`<div style='padding:40px;text-align:center;'><h2 style='color:#c0392b;'>⚠️ No se encontraron resultados</h2><button onclick='location.reload()' style='padding:12px 25px;background:#2980b9;color:white;border:none;border-radius:6px;cursor:pointer;'>Volver</button></div>`;
         return;
     }
-
     let cabeceraSuperior = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid ${esBusquedaEstudiante?'#2980b9':'#27ae60'}; padding-bottom:10px;">
         <h2 style='color:${esBusquedaEstudiante?'#2980b9':'#27ae60'}; margin:0;'>${esBusquedaEstudiante?'👤 Historial: '+estudianteObjetivo:'✅ Auditoría Consolidada'}</h2>
@@ -362,34 +383,32 @@ async function ejecutarExtractor(estudianteObjetivo){
             <button onclick='location.reload()' style='padding:10px 15px; background:#7f8c8d; color:white; border:none; border-radius:6px; cursor:pointer; transition:0.2s;'>⬅️ Volver</button>
         </div>
     </div>`;
-
+    
     let titulosColumnas = esBusquedaEstudiante 
         ? ['Asignatura', 'Docente', 'Fechas Homologadas', 'Evaluación', 'Nota'] 
-        : ['Asignatura', 'Docente', 'Correo', 'Último Acceso', 'Acciones Consolidadas', 'Fechas Homologadas', 'Evaluación', '¿Docente Participó?', 'Faltan', 'Alumnos', 'Rendimiento'];
-
+        : ['Asignatura', 'Docente', 'Correo', 'Último Acceso', 'Acciones Consolidadas', 'Fechas Homologadas', 'Evaluación', '¿Docente Participó?', 'Faltan', 'Alumnos', 'Rendimiento', 'Detalle'];
+    
     let theadCompleto = `
     <thead style='background:${esBusquedaEstudiante?'#2980b9':'#27ae60'};color:white;position:sticky;top:0;z-index:10;'>
         <tr>${titulosColumnas.map(t => `<th style='padding:10px;border:1px solid #bdc3c7;'>${t}</th>`).join('')}</tr>
         <tr class="fila-filtros" style="background:#eaeded;">
             ${titulosColumnas.map((_, i) => {
-                if(!esBusquedaEstudiante && i === 4) return `<th style='padding:4px;border:1px solid #bdc3c7;'><input class="filtro-col" disabled type="text" style="width:100%;box-sizing:border-box;font-size:11px;padding:5px;border:1px solid #ccc;border-radius:4px;background:#ddd;cursor:not-allowed;"></th>`;
+                if(!esBusquedaEstudiante && (i === 4 || i === 11)) return `<th style='padding:4px;border:1px solid #bdc3c7;'><input class="filtro-col" disabled type="text" style="width:100%;box-sizing:border-box;font-size:11px;padding:5px;border:1px solid #ccc;border-radius:4px;background:#ddd;cursor:not-allowed;"></th>`;
                 return `<th style='padding:4px;border:1px solid #bdc3c7;'><input class="filtro-col" type="text" placeholder="Filtrar..." style="width:100%;box-sizing:border-box;font-size:11px;padding:5px;border:1px solid #ccc;border-radius:4px;outline:none;"></th>`;
             }).join('')}
         </tr>
     </thead>`;
-
     document.body.innerHTML=`<div style='padding:20px; font-family:sans-serif;'>${cabeceraSuperior}<div style='overflow-x:auto; max-height:85vh; border:1px solid #bdc3c7; box-shadow:0 5px 15px rgba(0,0,0,0.05);'><table id='tablaAuditoria' style='border-collapse:collapse;width:100%;font-size:12px;'>${theadCompleto}<tbody></tbody></table></div></div>`;
-
     document.querySelectorAll('.filtro-col').forEach(input => {
         input.addEventListener('input', renderTabla);
     });
-
     const btnExp = document.getElementById('btnExportar');
     if (btnExp) {
         btnExp.onclick = () => {
             let table = document.getElementById('tablaAuditoria');
             let htmlTable = table.outerHTML;
             htmlTable = htmlTable.replace(/<input[^>]*>/gi, '');
+            htmlTable = htmlTable.replace(/<button[^>]*>.*?<\/button>/gi, '');
             let blob = new Blob(['\ufeff' + htmlTable], { type: 'application/vnd.ms-excel' });
             let url = URL.createObjectURL(blob);
             let a = document.createElement('a');
@@ -398,7 +417,6 @@ async function ejecutarExtractor(estudianteObjetivo){
             a.click();
         };
     }
-
     function renderTabla(){
         let inputs = Array.from(document.querySelectorAll('.filtro-col')).map(el => el.value.toLowerCase().trim());
         let html = "";
@@ -429,7 +447,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                     return true;
                 }
             });
-
             if(itemsFiltrados.length > 0) {
                 let bg = coloresPastel[contador % coloresPastel.length];
                 contador++;
@@ -438,7 +455,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                 for(let k = 0; k < itemsFiltrados.length; k++){
                     let it = itemsFiltrados[k];
                     let estiloSeparador = k === 0 ? 'border-top: 3.5px solid #95a5a6;' : '';
-
                     html += `<tr style='background-color:${bg};'>`;
                     if(k === 0) {
                         if(esBusquedaEstudiante) {
@@ -458,12 +474,17 @@ async function ejecutarExtractor(estudianteObjetivo){
                                  <td style='padding:10px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;'>${it.notaTexto}</td></tr>`;
                     } else {
                         let bgRendimiento = obtenerColorRendimiento(it.rendimiento, it.textoTermino);
+                        let btnDetalle = it.faltan > 0 
+                            ? `<button onclick="window.mostrarEstudiantesSinNota('${encodeURIComponent(it.estudiantesSinNota.join('||'))}')" style="padding:4px 8px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:10px; font-weight:bold;">Ver Alumnos</button>` 
+                            : `<span style="color:#7f8c8d;font-size:10px;">Completo</span>`;
+
                         html += `<td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}font-size:11px;'>${it.fechasStr}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}'>${it.colNom}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${it.statusForo}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;color:${it.faltan>0?"#c0392b":"#27ae60"};'>${it.faltan}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${it.totalAlumnos}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;background-color:${bgRendimiento};'>${it.rendimiento}%</td>
+                                 <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${btnDetalle}</td>
                                  </tr>`;
                     }
                 }
@@ -474,8 +495,6 @@ async function ejecutarExtractor(estudianteObjetivo){
     
     renderTabla();
 }
-
-/* 👇 LÓGICA INFALIBLE DE FOROS PROPORCIONADA ORIGINALMENTE 👇 */
 async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
     let urlForoObjetivo=col.urlDirecta&&(col.urlDirecta.includes("mod/forum/view.php")||col.urlDirecta.includes("mod/forum/discuss.php"))?col.urlDirecta:null;
     if(!urlForoObjetivo || !urlForoObjetivo.includes("forum")){
@@ -484,15 +503,12 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
             let dCurso = dCursoPreload; 
             let secciones = dCurso.querySelectorAll('#accordionEx1 > .card, .course-content .section');
             let forosCandidatos = [];
-
             secciones.forEach(seccion => {
                 let header = seccion.querySelector('.card-header h5, .sectionname');
                 let tituloSeccion = header ? normalizarTexto(header.textContent) : '';
                 let numsSeccion = tituloSeccion.match(/\d+/g) || [];
-
                 let numeroCoincide = true;
                 if (numsCol.length > 0 && numsSeccion.length > 0) numeroCoincide = numsCol.some(n => numsSeccion.includes(n));
-
                 if (numeroCoincide) {
                     let enlacesForo = seccion.querySelectorAll('a[href*="/mod/forum/view.php"], a[href*="/mod/forum/discuss.php"]');
                     enlacesForo.forEach(enlace => {
@@ -506,7 +522,6 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
                     });
                 }
             });
-
             let mejorCandidato = forosCandidatos.find(f => f.esSalaDeClases);
             if (mejorCandidato) urlForoObjetivo = mejorCandidato.href;
             else if (forosCandidatos.length > 0) urlForoObjetivo = forosCandidatos[0].href;
@@ -515,26 +530,20 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
     
     if(!urlForoObjetivo) return "<span style='color:#d35400;'>⚠️ No link</span>";
     let linkDebug = `<br><a href="${urlForoObjetivo}" target="_blank" style="font-size:10px;color:#3498db;text-decoration:none;">🔗 Ver foro</a>`;
-
     try{
         let rForo=await fetch(urlForoObjetivo);
         let rawHtmlForo = await rForo.text();
         let profeEncontrado = false;
         let estudiantes = new Set();
-
         if (pId && (rawHtmlForo.includes(`id=${pId}&`) || rawHtmlForo.includes(`id=${pId}"`) || rawHtmlForo.includes(`userid":${pId}`) || rawHtmlForo.includes(`userid":"${pId}"`))) profeEncontrado = true;
-
         let dForo = new DOMParser().parseFromString(rawHtmlForo,"text/html");
         function escanearDoc(doc) {
             doc.querySelectorAll('aside, nav, header, footer, #block-region-side-pre, #block-region-side-post, .block, .navbar').forEach(el => el.remove());
             let main = doc.querySelector('#region-main, [role="main"], #maincontent, .course-content') || doc.body;
-
             if(pId && main.innerHTML.includes(`id=${pId}`)) profeEncontrado = true;
-
             doc.querySelectorAll('.forumpost, article.forum-post, tr.discussion, .discussion-list-item, td.author, a[href*="user/view.php"]').forEach(post => {
                 let html = post.innerHTML || "";
                 if (pId && html.includes(`id=${pId}`)) profeEncontrado = true;
-
                 let imgAutor = post.querySelector('img.userpicture');
                 let linkAutor = post.tagName.toLowerCase() === 'a' ? post : post.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
                 
@@ -545,11 +554,9 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
             });
         }
         escanearDoc(dForo);
-
         if(!profeEncontrado) {
             let linksDebates = Array.from(dForo.querySelectorAll('a[href*="discuss.php?d="]')).map(a => a.href.split('#')[0]);
             let linksUnicos = [...new Set(linksDebates)].slice(0, 8); 
-
             for(let link of linksUnicos) {
                 if(profeEncontrado) break; 
                 try {
@@ -563,7 +570,6 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
                 } catch(e){}
             }
         }
-
         if(profeEncontrado) return `<span style='color:#27ae60;font-weight:bold;'>✅ Sí</span>${linkDebug}`;
         
         let arrEstudiantes = Array.from(estudiantes);
@@ -575,6 +581,5 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
         
     }catch(e){return "<span style='color:#7f8c8d;'>⚠️ Error</span>";}
 }
-
 iniciarPanelUI();
 })();
