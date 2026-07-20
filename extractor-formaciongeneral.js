@@ -1,9 +1,8 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[52547,53519,53736,53552,53803];
+const ids=[52547,53519,53736,53524,53802,53525,53535,53157,53161,53166,52429,52087,53526,53536,51266,52122,53673,53527,53537,53554,52581,52575,53520,53528,53158,51730,51719,51720,53529,53538,53521,53530,53539,53562,53159,53162,52552,50920,53522,53531,53540,53549,53556,51517,51274,53523,53532,53550,52750,53163,50919,50921,53533,53542,51581,53164,52751,52607,52752,52428,52559,53683,53534,53543,53552,53803];
 /* 👆 TODOS TUS IDs CARGADOS 👆 */
 const coloresPastel=['#ffffff', '#fcfcfc'];
-// --- NUEVA FUNCIÓN PARA MODAL DE ESTUDIANTES ---
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
     let estudiantes = decodeURIComponent(datosCodificados).split('||');
     let listaHtml = estudiantes.map(e => `<li style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">👤 ${e}</li>`).join('');
@@ -114,6 +113,8 @@ async function ejecutarExtractor(estudianteObjetivo){
             document.getElementById('pct').textContent=`${i+1}/${ids.length} Aulas`;
             document.getElementById('s').textContent="Procesando: "+nombreCurso;
             
+            let linkAsignatura = `<a href="https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}" target="_blank" style="color:#2980b9; text-decoration:none;">${nombreCurso}</a>`;
+            
             let pNombre="No asignado",pCorreo="No disponible",pAcceso="Nunca ha ingresado",pId=null;
             let rProf=await fetch(`https://e-campus.uniacc.cl/user/index.php?id=${ids[i]}&perpage=5000`);
             let dProf=new DOMParser().parseFromString(await rProf.text(),"text/html");
@@ -209,13 +210,22 @@ async function ejecutarExtractor(estudianteObjetivo){
                 });
             }
             
+            // 👇 Lógica de Ciclo 👇
+            let cicloAsignatura = "-";
+            if (arregloUnidades.length > 0 && arregloUnidades[0].inicio) {
+                let fInicioPrimera = parsearFechaMoodle(arregloUnidades[0].inicio);
+                if (fInicioPrimera) {
+                    if (fInicioPrimera.getMonth() === 2) cicloAsignatura = "1er Ciclo";
+                    else if (fInicioPrimera.getMonth() === 4) cicloAsignatura = "2do Ciclo";
+                }
+            }
+
             let filaMaestra=Array.from(d.querySelectorAll('table tr')).find(f=>(f.textContent||"").includes("Nombre / Apellido")||(f.textContent||"").includes("Dirección de correo"));
             if(filaMaestra){
                 let colValidas=[];
                 Array.from(filaMaestra.cells).forEach((celda,idx)=>{
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
                     let nomMin=nom.toLowerCase();
-                    // 👇 Regla 1: Exclusión de "repetición" agregada al regex 👇
                     if(/foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin) && !/total|promedio|ad:|diagnostica|diagnóstica|repetición|repeticion/i.test(nomMin)){
                         let linkActividad=celda.querySelector('a[href*="mod/"]');
                         let actId = null;
@@ -232,7 +242,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                 if(esBusquedaEstudiante){
                     let filaEstudiante=Array.from(filasDatos).find(row=>(row.innerHTML.toLowerCase().includes(estudianteObjetivo))||(row.textContent||"").toLowerCase().includes(estudianteObjetivo));
                     if(filaEstudiante&&colValidas.length>0){
-                        let cursoObj = { nombreCurso, pNombre, items: [] };
+                        let cursoObj = { nombreCurso, linkAsignatura, cicloAsignatura, pNombre, items: [] };
                         for(let indiceColumna=0;indiceColumna<colValidas.length;indiceColumna++){
                             let col=colValidas[indiceColumna];
                             let rawNota=filaEstudiante.cells[col.idx]?.textContent||"-";
@@ -277,7 +287,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let textoTermino = "Cierre del curso";
                             let fLimite = null;
 
-                            // 👇 Regla 2: Lógica de cálculo dinámico para el Límite (fLimite) 👇
                             if (arregloUnidades[unidadAsignada - 1]) {
                                 let uObj = arregloUnidades[unidadAsignada - 1];
                                 fechasStr = `<b>Inicio:</b> ${uObj.inicio}<br><b>Término:</b> ${uObj.termino}`;
@@ -307,14 +316,14 @@ async function ejecutarExtractor(estudianteObjetivo){
                                 totalAlumnos: totalAlumnos, rendimiento: Math.round((totalAlumnos-faltan)/totalAlumnos*100),
                                 fechasStr: fechasStr, textoTermino: textoTermino,
                                 estudiantesSinNota: estudiantesSinNota,
-                                fLimite: fLimite // 👈 Guardamos el límite real calculado
+                                fLimite: fLimite 
                             });
                         }
                     }
                     
                     if(filasAImprimir.length > 0) {
                         let cAcceso = configurarColorAcceso(pAcceso);
-                        let cursoObj = { nombreCurso, pNombre, pCorreo, pAcceso, cAcceso, items: filasAImprimir };
+                        let cursoObj = { nombreCurso, linkAsignatura, cicloAsignatura, pNombre, pCorreo, pAcceso, cAcceso, items: filasAImprimir };
                         let cursoFaltanNotas = filasAImprimir.some(item => {
                             if(item.faltan === 0) return false;
                             if(item.fLimite && new Date() < item.fLimite) return false; 
@@ -332,13 +341,23 @@ async function ejecutarExtractor(estudianteObjetivo){
                         
                         let textoExplicacionCeros = "En caso de haber revisado todos los trabajos, y que aun falten notas, es porque debe ingresar el 1,0 a aquellos estudiantes que no hayan entregado la evaluación. Esto se puede hacer a través de la rúbrica (marcando todos los puntajes mínimos) o editando el libro de calificaciones e ingresando directamente el 1,0 en aquellas casillas vacías.";
                         
-                        let resumenNotasFaltantes = "";
+                        // 👇 Lógica para segmentar Formativas vs Todo Pendiente 👇
+                        let resumenNotasFaltantes = ""; // Va para el correo exclusivo de Notas (Muestra Todo)
+                        let resumenNotasTodoPendiente = ""; // Va para el correo Todo Pendiente (Sin Formativas)
+                        let tieneNotasParaTodoPendiente = false;
+
                         filasAImprimir.forEach(item => {
                             if(item.faltan > 0) {
                                 let pasoPlazo = true;
                                 if(item.fLimite && new Date() < item.fLimite) pasoPlazo = false; 
                                 if(pasoPlazo) {
-                                    resumenNotasFaltantes += `\n - ${item.colNom}: faltan ${item.faltan} estudiante${item.faltan > 1 ? 's' : ''}`;
+                                    let textoLinea = `\n - ${item.colNom}: faltan ${item.faltan} estudiante${item.faltan > 1 ? 's' : ''}`;
+                                    resumenNotasFaltantes += textoLinea; // Agrega a ambas siempre que pase el plazo
+                                    
+                                    if(!/formativa/i.test(item.colNom)) {
+                                        resumenNotasTodoPendiente += textoLinea;
+                                        tieneNotasParaTodoPendiente = true;
+                                    }
                                 }
                             }
                         });
@@ -347,15 +366,17 @@ async function ejecutarExtractor(estudianteObjetivo){
                         let listaPendientesMaestra = [];
                         if(sinAcceso7Dias) listaPendientesMaestra.push("- Regularizar su acceso a la plataforma (registra alerta de inactividad).");
                         if(cursoFaltaForo) listaPendientesMaestra.push("- Participación, respuesta o moderación en los foros de discusión.");
-                        if(cursoFaltanNotas) listaPendientesMaestra.push("- Ingreso de calificaciones pendientes en el libro de notas (plazo de revisión cumplido).");
+                        if(tieneNotasParaTodoPendiente) listaPendientesMaestra.push("- Ingreso de calificaciones pendientes en el libro de notas (plazo de revisión cumplido).");
                         
+                        // Botón "Todo Pendiente" (Usa resumenNotasTodoPendiente excluyendo formativas)
                         if(listaPendientesMaestra.length > 0 && pCorreo.includes('@')) {
                             let subjTodo = encodeURIComponent(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
-                            let extraText = cursoFaltanNotas ? `\n\nActividades con calificaciones pendientes:${resumenNotasFaltantes}\n\n${textoExplicacionCeros}` : '';
+                            let extraText = tieneNotasParaTodoPendiente ? `\n\nActividades con calificaciones pendientes:${resumenNotasTodoPendiente}\n\n${textoExplicacionCeros}` : '';
                             let bodyTodo = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}${extraText}\n\nLe recordamos la importancia de mantener estas actividades al día para el correcto seguimiento de nuestros estudiantes.\n\nQuedo atento/a ante cualquier duda o inconveniente técnico.\n\nSaludos cordiales.`);
                             arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjTodo}&body=${bodyTodo}" style="display:inline-block;width:100px;padding:6px;background:#34495e;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;border:1px solid #2c3e50;">✉️ Todo Pendiente</a>`);
                             arrayBotones.push(`<div style="height:4px; border-bottom:1px dashed #ccc; margin-bottom:4px;"></div>`);
                         }
+                        // Botón "Faltan Notas" (Usa resumenNotasFaltantes donde va TODO)
                         if(cursoFaltanNotas && pCorreo.includes('@')) {
                             let subjNotas = encodeURIComponent(`Pendiente ingreso de calificaciones - ${nombreCurso}`);
                             let bodyNotas = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que existen calificaciones pendientes por ingresar en la asignatura ${nombreCurso}:\n${resumenNotasFaltantes}\n\n${textoExplicacionCeros}\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
@@ -393,24 +414,27 @@ async function ejecutarExtractor(estudianteObjetivo){
         </div>
     </div>`;
     
+    // 👇 Nuevas columnas añadidas a la vista principal y estudiante 👇
     let titulosColumnas = esBusquedaEstudiante 
-        ? ['Asignatura', 'Docente', 'Fechas Homologadas', 'Evaluación', 'Nota'] 
-        : ['Asignatura', 'Docente', 'Correo', 'Último Acceso', 'Acciones Consolidadas', 'Fechas Homologadas', 'Evaluación', '¿Docente Participó?', 'Faltan', 'Alumnos', 'Rendimiento', 'Detalle'];
+        ? ['Asignatura', 'Ciclo', 'Docente', 'Fechas Homologadas', 'Evaluación', 'Nota'] 
+        : ['Asignatura', 'Ciclo', 'Docente', 'Correo', 'Último Acceso', 'Acciones Consolidadas', 'Fechas Homologadas', 'Evaluación', '¿Docente Participó?', 'Faltan', 'Alumnos', 'Rendimiento', 'Detalle'];
     
     let theadCompleto = `
     <thead style='background:${esBusquedaEstudiante?'#2980b9':'#27ae60'};color:white;position:sticky;top:0;z-index:10;'>
         <tr>${titulosColumnas.map(t => `<th style='padding:10px;border:1px solid #bdc3c7;'>${t}</th>`).join('')}</tr>
         <tr class="fila-filtros" style="background:#eaeded;">
             ${titulosColumnas.map((_, i) => {
-                if(!esBusquedaEstudiante && (i === 4 || i === 11)) return `<th style='padding:4px;border:1px solid #bdc3c7;'><input class="filtro-col" disabled type="text" style="width:100%;box-sizing:border-box;font-size:11px;padding:5px;border:1px solid #ccc;border-radius:4px;background:#ddd;cursor:not-allowed;"></th>`;
+                if(!esBusquedaEstudiante && (i === 5 || i === 12)) return `<th style='padding:4px;border:1px solid #bdc3c7;'><input class="filtro-col" disabled type="text" style="width:100%;box-sizing:border-box;font-size:11px;padding:5px;border:1px solid #ccc;border-radius:4px;background:#ddd;cursor:not-allowed;"></th>`;
                 return `<th style='padding:4px;border:1px solid #bdc3c7;'><input class="filtro-col" type="text" placeholder="Filtrar..." style="width:100%;box-sizing:border-box;font-size:11px;padding:5px;border:1px solid #ccc;border-radius:4px;outline:none;"></th>`;
             }).join('')}
         </tr>
     </thead>`;
     document.body.innerHTML=`<div style='padding:20px; font-family:sans-serif;'>${cabeceraSuperior}<div style='overflow-x:auto; max-height:85vh; border:1px solid #bdc3c7; box-shadow:0 5px 15px rgba(0,0,0,0.05);'><table id='tablaAuditoria' style='border-collapse:collapse;width:100%;font-size:12px;'>${theadCompleto}<tbody></tbody></table></div></div>`;
+    
     document.querySelectorAll('.filtro-col').forEach(input => {
         input.addEventListener('input', renderTabla);
     });
+    
     const btnExp = document.getElementById('btnExportar');
     if (btnExp) {
         btnExp.onclick = () => {
@@ -426,6 +450,7 @@ async function ejecutarExtractor(estudianteObjetivo){
             a.click();
         };
     }
+    
     function renderTabla(){
         let inputs = Array.from(document.querySelectorAll('.filtro-col')).map(el => el.value.toLowerCase().trim());
         let html = "";
@@ -437,22 +462,24 @@ async function ejecutarExtractor(estudianteObjetivo){
             let itemsFiltrados = curso.items.filter(item => {
                 if(esBusquedaEstudiante) {
                     if(inputs[0] && !curso.nombreCurso.toLowerCase().includes(inputs[0])) return false;
-                    if(inputs[1] && !curso.pNombre.toLowerCase().includes(inputs[1])) return false;
-                    if(inputs[2] && !item.fechasStr.toLowerCase().includes(inputs[2])) return false;
-                    if(inputs[3] && !(item.colNom + " " + item.statusForo).toLowerCase().includes(inputs[3])) return false;
-                    if(inputs[4] && !item.notaTexto.toLowerCase().includes(inputs[4])) return false;
+                    if(inputs[1] && !curso.cicloAsignatura.toLowerCase().includes(inputs[1])) return false;
+                    if(inputs[2] && !curso.pNombre.toLowerCase().includes(inputs[2])) return false;
+                    if(inputs[3] && !item.fechasStr.toLowerCase().includes(inputs[3])) return false;
+                    if(inputs[4] && !(item.colNom + " " + item.statusForo).toLowerCase().includes(inputs[4])) return false;
+                    if(inputs[5] && !item.notaTexto.toLowerCase().includes(inputs[5])) return false;
                     return true;
                 } else {
                     if(inputs[0] && !curso.nombreCurso.toLowerCase().includes(inputs[0])) return false;
-                    if(inputs[1] && !curso.pNombre.toLowerCase().includes(inputs[1])) return false;
-                    if(inputs[2] && !curso.pCorreo.toLowerCase().includes(inputs[2])) return false;
-                    if(inputs[3] && !curso.pAcceso.toLowerCase().includes(inputs[3])) return false;
-                    if(inputs[5] && !item.fechasStr.toLowerCase().includes(inputs[5])) return false;
-                    if(inputs[6] && !item.colNom.toLowerCase().includes(inputs[6])) return false;
-                    if(inputs[7] && !item.statusForo.toLowerCase().includes(inputs[7])) return false;
-                    if(inputs[8] && !item.faltan.toString().includes(inputs[8])) return false;
-                    if(inputs[9] && !item.totalAlumnos.toString().includes(inputs[9])) return false;
-                    if(inputs[10] && !(item.rendimiento+"%").includes(inputs[10])) return false;
+                    if(inputs[1] && !curso.cicloAsignatura.toLowerCase().includes(inputs[1])) return false;
+                    if(inputs[2] && !curso.pNombre.toLowerCase().includes(inputs[2])) return false;
+                    if(inputs[3] && !curso.pCorreo.toLowerCase().includes(inputs[3])) return false;
+                    if(inputs[4] && !curso.pAcceso.toLowerCase().includes(inputs[4])) return false;
+                    if(inputs[6] && !item.fechasStr.toLowerCase().includes(inputs[6])) return false;
+                    if(inputs[7] && !item.colNom.toLowerCase().includes(inputs[7])) return false;
+                    if(inputs[8] && !item.statusForo.toLowerCase().includes(inputs[8])) return false;
+                    if(inputs[9] && !item.faltan.toString().includes(inputs[9])) return false;
+                    if(inputs[10] && !item.totalAlumnos.toString().includes(inputs[10])) return false;
+                    if(inputs[11] && !(item.rendimiento+"%").includes(inputs[11])) return false;
                     return true;
                 }
             });
@@ -467,10 +494,12 @@ async function ejecutarExtractor(estudianteObjetivo){
                     html += `<tr style='background-color:${bg};'>`;
                     if(k === 0) {
                         if(esBusquedaEstudiante) {
-                            html += `<td rowspan="${rs}" style='padding:12px;border:1px solid #bdc3c7;${estiloSeparador}font-weight:bold;'>${curso.nombreCurso}</td>
+                            html += `<td rowspan="${rs}" style='padding:12px;border:1px solid #bdc3c7;${estiloSeparador}font-weight:bold;'>${curso.linkAsignatura}</td>
+                                     <td rowspan="${rs}" style='padding:12px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${curso.cicloAsignatura}</td>
                                      <td rowspan="${rs}" style='padding:12px;border:1px solid #bdc3c7;${estiloSeparador}font-weight:bold;'>${curso.pNombre}</td>`;
                         } else {
-                            html += `<td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}'>${curso.nombreCurso}</td>
+                            html += `<td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}font-weight:bold;'>${curso.linkAsignatura}</td>
+                                     <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${curso.cicloAsignatura}</td>
                                      <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}font-weight:bold;'>${curso.pNombre}</td>
                                      <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}color:#2980b9;'>${curso.pCorreo}</td>
                                      <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}color:${curso.cAcceso};font-weight:bold;'>${curso.pAcceso}</td>
@@ -482,7 +511,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                                  <td style='padding:10px;border:1px solid #bdc3c7;${estiloSeparador}'>${it.colNom} ${it.statusForo!=='No aplica'&&!it.statusForo.includes('No')?`(${it.statusForo})`:''}</td>
                                  <td style='padding:10px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;'>${it.notaTexto}</td></tr>`;
                     } else {
-                        // 👇 Usamos la nueva propiedad fLimite para el color 👇
                         let bgRendimiento = obtenerColorRendimiento(it.rendimiento, it.fLimite);
                         let btnDetalle = it.faltan > 0 
                             ? `<button onclick="window.mostrarEstudiantesSinNota('${encodeURIComponent(it.estudiantesSinNota.join('||'))}')" style="padding:4px 8px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:10px; font-weight:bold;">Ver Alumnos</button>` 
