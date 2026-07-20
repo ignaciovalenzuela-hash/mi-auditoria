@@ -1,8 +1,19 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[52547,53519,53736];
+const ids=[52547,53519];
 /* 👆 TODOS TUS IDs CARGADOS 👆 */
 const coloresPastel=['#ffffff', '#fcfcfc'];
+
+// Función segura para codificar el texto del correo sin romper el script
+function codificarTextoSeguro(str) {
+    try {
+        return encodeURIComponent(str);
+    } catch(e) {
+        // Si hay un carácter inválido (como un emoji a medias), lo limpiamos y reintentamos
+        let limpio = str.replace(/[\uD800-\uDFFF]/g, '');
+        return encodeURIComponent(limpio);
+    }
+}
 
 // --- NUEVA FUNCIÓN PARA MODAL DE ESTUDIANTES ---
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
@@ -318,19 +329,23 @@ async function ejecutarExtractor(estudianteObjetivo){
                         
                         let textoExplicacionCeros = "En caso de haber revisado todos los trabajos, y que aun falten notas, es porque debe ingresar el 1,0 a aquellos estudiantes que no hayan entregado la evaluación. Esto se puede hacer a través de la rúbrica (marcando todos los puntajes mínimos) o editando el libro de calificaciones e ingresando directamente el 1,0 en aquellas casillas vacías.";
 
-                        // 👇 NUEVO: CUADRO SOBRIO DE ESTUDIANTES FALTANTES PARA EL CORREO 👇
+                        // 👇 CONSTRUCCIÓN SEGURA DEL CUADRO SOBRIO 👇
                         let detalleFaltantesTexto = "";
-                        let evalsFaltantes = filasAImprimir.filter(item => item.faltan > 0);
-                        if(evalsFaltantes.length > 0) {
-                            detalleFaltantesTexto = "\n\n=========================================\n  DETALLE DE ESTUDIANTES SIN CALIFICAR\n=========================================\n";
-                            evalsFaltantes.forEach(ev => {
-                                detalleFaltantesTexto += `\nEvaluación: ${ev.colNom}\n`;
-                                ev.estudiantesSinNota.forEach(est => {
-                                    detalleFaltantesTexto += ` - ${est}\n`;
+                        try {
+                            let evalsFaltantes = filasAImprimir.filter(item => item.faltan > 0);
+                            if(evalsFaltantes.length > 0) {
+                                detalleFaltantesTexto = "\n\n=========================================\n  DETALLE DE ESTUDIANTES SIN CALIFICAR\n=========================================\n";
+                                evalsFaltantes.forEach(ev => {
+                                    detalleFaltantesTexto += `\nEvaluación: ${ev.colNom || 'Sin especificar'}\n`;
+                                    if(ev.estudiantesSinNota && Array.isArray(ev.estudiantesSinNota)) {
+                                        ev.estudiantesSinNota.forEach(est => {
+                                            detalleFaltantesTexto += ` - ${est}\n`;
+                                        });
+                                    }
                                 });
-                            });
-                            detalleFaltantesTexto += "\n=========================================";
-                        }
+                                detalleFaltantesTexto += "\n=========================================";
+                            }
+                        } catch(errorDetalle) { console.error("Error aislando alumnos faltantes", errorDetalle); }
 
                         let arrayBotones = [];
                         let listaPendientesMaestra = [];
@@ -339,27 +354,25 @@ async function ejecutarExtractor(estudianteObjetivo){
                         if(cursoFaltanNotas) listaPendientesMaestra.push("- Ingreso de calificaciones pendientes en el libro de notas (plazo de una semana cumplido).");
                         
                         if(listaPendientesMaestra.length > 0 && pCorreo.includes('@')) {
-                            let subjTodo = encodeURIComponent(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
-                            // Se inyecta el detalleFaltantesTexto al final
+                            let subjTodo = codificarTextoSeguro(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
                             let extraText = cursoFaltanNotas ? `\n\n${textoExplicacionCeros}${detalleFaltantesTexto}` : '';
-                            let bodyTodo = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}${extraText}\n\nLe recordamos la importancia de mantener estas actividades al día para el correcto seguimiento de nuestros estudiantes.\n\nQuedo atento/a ante cualquier duda o inconveniente técnico.\n\nSaludos cordiales.`);
+                            let bodyTodo = codificarTextoSeguro(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}${extraText}\n\nLe recordamos la importancia de mantener estas actividades al día para el correcto seguimiento de nuestros estudiantes.\n\nQuedo atento/a ante cualquier duda o inconveniente técnico.\n\nSaludos cordiales.`);
                             arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjTodo}&body=${bodyTodo}" style="display:inline-block;width:100px;padding:6px;background:#34495e;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;border:1px solid #2c3e50;">✉️ Todo Pendiente</a>`);
                             arrayBotones.push(`<div style="height:4px; border-bottom:1px dashed #ccc; margin-bottom:4px;"></div>`);
                         }
                         if(cursoFaltanNotas && pCorreo.includes('@')) {
-                            let subjNotas = encodeURIComponent(`Pendiente ingreso de calificaciones - ${nombreCurso}`);
-                            // Se inyecta el detalleFaltantesTexto al final
-                            let bodyNotas = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que existen calificaciones pendientes por ingresar en la asignatura ${nombreCurso}.\n\n${textoExplicacionCeros}${detalleFaltantesTexto}\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
+                            let subjNotas = codificarTextoSeguro(`Pendiente ingreso de calificaciones - ${nombreCurso}`);
+                            let bodyNotas = codificarTextoSeguro(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que existen calificaciones pendientes por ingresar en la asignatura ${nombreCurso}.\n\n${textoExplicacionCeros}${detalleFaltantesTexto}\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
                             arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjNotas}&body=${bodyNotas}" style="display:inline-block;width:100px;padding:6px;background:#e67e22;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;">✉️ Faltan Notas</a>`);
                         }
                         if(cursoFaltaForo && pCorreo.includes('@')) {
-                            let subjForo = encodeURIComponent(`Pendiente participación en foros - ${nombreCurso}`);
-                            let bodyForo = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que se encuentra pendiente su participación/moderación en los foros de la asignatura ${nombreCurso}.\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
+                            let subjForo = codificarTextoSeguro(`Pendiente participación en foros - ${nombreCurso}`);
+                            let bodyForo = codificarTextoSeguro(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que se encuentra pendiente su participación/moderación en los foros de la asignatura ${nombreCurso}.\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
                             arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjForo}&body=${bodyForo}" style="display:inline-block;width:100px;padding:6px;background:#c0392b;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;">✉️ Falta Foro</a>`);
                         }
                         if(sinAcceso7Dias && pCorreo.includes('@')) {
-                            let subjAcceso = encodeURIComponent(`Alerta de inactividad - ${nombreCurso}`);
-                            let bodyAcceso = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo debido a que el sistema registra que no ha ingresado a la plataforma por 7 días o más en la asignatura ${nombreCurso}.\n\nLe recordamos la importancia de mantener una revisión constante para el buen desarrollo del curso.\n\nQuedo atento/a ante cualquier inconveniente técnico o personal.\n\nSaludos cordiales.`);
+                            let subjAcceso = codificarTextoSeguro(`Alerta de inactividad - ${nombreCurso}`);
+                            let bodyAcceso = codificarTextoSeguro(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo debido a que el sistema registra que no ha ingresado a la plataforma por 7 días o más en la asignatura ${nombreCurso}.\n\nLe recordamos la importancia de mantener una revisión constante para el buen desarrollo del curso.\n\nQuedo atento/a ante cualquier inconveniente técnico o personal.\n\nSaludos cordiales.`);
                             arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjAcceso}&body=${bodyAcceso}" style="display:inline-block;width:100px;padding:6px;background:#8e44ad;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;">✉️ Sin Acceso</a>`);
                         }
                         
@@ -474,8 +487,9 @@ async function ejecutarExtractor(estudianteObjetivo){
                                  <td style='padding:10px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;'>${it.notaTexto}</td></tr>`;
                     } else {
                         let bgRendimiento = obtenerColorRendimiento(it.rendimiento, it.textoTermino);
+                        // Utilizamos codificarTextoSeguro también aquí para no romper el botón de la UI
                         let btnDetalle = it.faltan > 0 
-                            ? `<button onclick="window.mostrarEstudiantesSinNota('${encodeURIComponent(it.estudiantesSinNota.join('||'))}')" style="padding:4px 8px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:10px; font-weight:bold;">Ver Alumnos</button>` 
+                            ? `<button onclick="window.mostrarEstudiantesSinNota('${codificarTextoSeguro(it.estudiantesSinNota.join('||'))}')" style="padding:4px 8px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:10px; font-weight:bold;">Ver Alumnos</button>` 
                             : `<span style="color:#7f8c8d;font-size:10px;">Completo</span>`;
 
                         html += `<td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}font-size:11px;'>${it.fechasStr}</td>
