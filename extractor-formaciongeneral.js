@@ -1,9 +1,8 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[52547,53519,53736];
+const ids=[52547,53519,53736,53524];
 /* 👆 TODOS TUS IDs CARGADOS 👆 */
 const coloresPastel=['#ffffff', '#fcfcfc'];
-
 // --- NUEVA FUNCIÓN PARA MODAL DE ESTUDIANTES ---
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
     let estudiantes = decodeURIComponent(datosCodificados).split('||');
@@ -27,7 +26,6 @@ window.mostrarEstudiantesSinNota = function(datosCodificados) {
     `;
     document.body.appendChild(div);
 };
-
 function normalizarTexto(t){
     return t?t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim():"";
 }
@@ -259,7 +257,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                     let filasAImprimir = [];
                     for(let col of colValidas){
                         let faltan=0,totalAlumnos=0;
-                        let estudiantesSinNota = []; // 👇 Extracción de estudiantes faltantes 👇
+                        let estudiantesSinNota = []; 
                         filasDatos.forEach(row=>{
                             let linkEstudiante = row.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
                             if(linkEstudiante){
@@ -289,7 +287,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                                 colNom: col.nom, statusForo: statusForo, faltan: faltan,
                                 totalAlumnos: totalAlumnos, rendimiento: Math.round((totalAlumnos-faltan)/totalAlumnos*100),
                                 fechasStr: fechasStr, textoTermino: textoTermino,
-                                estudiantesSinNota: estudiantesSinNota // Guardado para la tabla
+                                estudiantesSinNota: estudiantesSinNota 
                             });
                         }
                     }
@@ -318,22 +316,39 @@ async function ejecutarExtractor(estudianteObjetivo){
                         
                         // 👇 TEXTO EXPLICATIVO PARA CORREOS 👇
                         let textoExplicacionCeros = "En caso de haber revisado todos los trabajos, y que aun falten notas, es porque debe ingresar el 1,0 a aquellos estudiantes que no hayan entregado la evaluación. Esto se puede hacer a través de la rúbrica (marcando todos los puntajes mínimos) o editando el libro de calificaciones e ingresando directamente el 1,0 en aquellas casillas vacías.";
+                        
+                        // 🛠️ CONSTRUCCIÓN INTELIGENTE DEL RESUMEN NUMÉRICO DE NOTAS FALTANTES 🛠️
+                        let resumenNotasFaltantes = "";
+                        filasAImprimir.forEach(item => {
+                            if(item.faltan > 0) {
+                                let fTermino = parsearFechaMoodle(item.textoTermino);
+                                let pasoPlazo = true;
+                                if(fTermino){
+                                    let fLimite = new Date(fTermino.getTime() + (7 * 24 * 60 * 60 * 1000));
+                                    if(new Date() < fLimite) pasoPlazo = false; 
+                                }
+                                if(pasoPlazo) {
+                                    resumenNotasFaltantes += `\n - ${item.colNom}: faltan ${item.faltan} estudiante${item.faltan > 1 ? 's' : ''}`;
+                                }
+                            }
+                        });
 
                         let arrayBotones = [];
                         let listaPendientesMaestra = [];
                         if(sinAcceso7Dias) listaPendientesMaestra.push("- Regularizar su acceso a la plataforma (registra alerta de inactividad).");
                         if(cursoFaltaForo) listaPendientesMaestra.push("- Participación, respuesta o moderación en los foros de discusión.");
                         if(cursoFaltanNotas) listaPendientesMaestra.push("- Ingreso de calificaciones pendientes en el libro de notas (plazo de una semana cumplido).");
+                        
                         if(listaPendientesMaestra.length > 0 && pCorreo.includes('@')) {
                             let subjTodo = encodeURIComponent(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
-                            let extraText = cursoFaltanNotas ? `\n\n${textoExplicacionCeros}` : '';
+                            let extraText = cursoFaltanNotas ? `\n\nActividades con calificaciones pendientes:${resumenNotasFaltantes}\n\n${textoExplicacionCeros}` : '';
                             let bodyTodo = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}${extraText}\n\nLe recordamos la importancia de mantener estas actividades al día para el correcto seguimiento de nuestros estudiantes.\n\nQuedo atento/a ante cualquier duda o inconveniente técnico.\n\nSaludos cordiales.`);
                             arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjTodo}&body=${bodyTodo}" style="display:inline-block;width:100px;padding:6px;background:#34495e;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;border:1px solid #2c3e50;">✉️ Todo Pendiente</a>`);
                             arrayBotones.push(`<div style="height:4px; border-bottom:1px dashed #ccc; margin-bottom:4px;"></div>`);
                         }
                         if(cursoFaltanNotas && pCorreo.includes('@')) {
                             let subjNotas = encodeURIComponent(`Pendiente ingreso de calificaciones - ${nombreCurso}`);
-                            let bodyNotas = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que existen calificaciones pendientes por ingresar en la asignatura ${nombreCurso}.\n\n${textoExplicacionCeros}\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
+                            let bodyNotas = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que existen calificaciones pendientes por ingresar en la asignatura ${nombreCurso}:\n${resumenNotasFaltantes}\n\n${textoExplicacionCeros}\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
                             arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjNotas}&body=${bodyNotas}" style="display:inline-block;width:100px;padding:6px;background:#e67e22;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;">✉️ Faltan Notas</a>`);
                         }
                         if(cursoFaltaForo && pCorreo.includes('@')) {
@@ -368,7 +383,6 @@ async function ejecutarExtractor(estudianteObjetivo){
         </div>
     </div>`;
     
-    // 👇 NUEVA COLUMNA AÑADIDA AL FINAL: 'Detalle' 👇
     let titulosColumnas = esBusquedaEstudiante 
         ? ['Asignatura', 'Docente', 'Fechas Homologadas', 'Evaluación', 'Nota'] 
         : ['Asignatura', 'Docente', 'Correo', 'Último Acceso', 'Acciones Consolidadas', 'Fechas Homologadas', 'Evaluación', '¿Docente Participó?', 'Faltan', 'Alumnos', 'Rendimiento', 'Detalle'];
@@ -393,7 +407,6 @@ async function ejecutarExtractor(estudianteObjetivo){
             let table = document.getElementById('tablaAuditoria');
             let htmlTable = table.outerHTML;
             htmlTable = htmlTable.replace(/<input[^>]*>/gi, '');
-            // Remueve botones de exportación para limpiar el excel
             htmlTable = htmlTable.replace(/<button[^>]*>.*?<\/button>/gi, '');
             let blob = new Blob(['\ufeff' + htmlTable], { type: 'application/vnd.ms-excel' });
             let url = URL.createObjectURL(blob);
@@ -460,11 +473,9 @@ async function ejecutarExtractor(estudianteObjetivo){
                                  <td style='padding:10px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;'>${it.notaTexto}</td></tr>`;
                     } else {
                         let bgRendimiento = obtenerColorRendimiento(it.rendimiento, it.textoTermino);
-                        // 👇 INYECCIÓN DEL BOTÓN DE DETALLE DE ALUMNOS FALTANTES 👇
                         let btnDetalle = it.faltan > 0 
                             ? `<button onclick="window.mostrarEstudiantesSinNota('${encodeURIComponent(it.estudiantesSinNota.join('||'))}')" style="padding:4px 8px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:10px; font-weight:bold;">Ver Alumnos</button>` 
                             : `<span style="color:#7f8c8d;font-size:10px;">Completo</span>`;
-
                         html += `<td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}font-size:11px;'>${it.fechasStr}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}'>${it.colNom}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${it.statusForo}</td>
