@@ -1,6 +1,6 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[52547,53519,53736,53524];
+const ids=[52547,53519,53736,53552,53803];
 /* 👆 TODOS TUS IDs CARGADOS 👆 */
 const coloresPastel=['#ffffff', '#fcfcfc'];
 // --- NUEVA FUNCIÓN PARA MODAL DE ESTUDIANTES ---
@@ -64,14 +64,10 @@ function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
     if (numNombre !== null && numNombre <= totalUnidades && numNombre > 0) return numNombre;
     return (idxCol !== -1 && idxCol < totalUnidades) ? idxCol + 1 : (totalUnidades || 1);
 }
-function obtenerColorRendimiento(pct, textoTermino) {
+function obtenerColorRendimiento(pct, fLimite) {
     let ahora = new Date();
-    let fechaTermino = parsearFechaMoodle(textoTermino);
-    if (fechaTermino) {
-        let fechaLimite = new Date(fechaTermino.getTime() + (7 * 24 * 60 * 60 * 1000));
-        if (ahora < fechaLimite) {
-            return pct >= 90 ? '#e8f8f5' : '#ffffff'; 
-        }
+    if (fLimite && ahora < fLimite) {
+        return pct >= 90 ? '#e8f8f5' : '#ffffff'; 
     }
     if (pct < 50) return '#fadbd8';  
     if (pct < 90) return '#fdebd0';  
@@ -219,7 +215,8 @@ async function ejecutarExtractor(estudianteObjetivo){
                 Array.from(filaMaestra.cells).forEach((celda,idx)=>{
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
                     let nomMin=nom.toLowerCase();
-                    if(/foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin) && !/total|promedio|ad:|diagnostica|diagnóstica/i.test(nomMin)){
+                    // 👇 Regla 1: Exclusión de "repetición" agregada al regex 👇
+                    if(/foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin) && !/total|promedio|ad:|diagnostica|diagnóstica|repetición|repeticion/i.test(nomMin)){
                         let linkActividad=celda.querySelector('a[href*="mod/"]');
                         let actId = null;
                         if (linkActividad) {
@@ -278,16 +275,39 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
                             let fechasStr = "No especificada";
                             let textoTermino = "Cierre del curso";
+                            let fLimite = null;
+
+                            // 👇 Regla 2: Lógica de cálculo dinámico para el Límite (fLimite) 👇
                             if (arregloUnidades[unidadAsignada - 1]) {
                                 let uObj = arregloUnidades[unidadAsignada - 1];
                                 fechasStr = `<b>Inicio:</b> ${uObj.inicio}<br><b>Término:</b> ${uObj.termino}`;
                                 textoTermino = uObj.termino;
+
+                                let totalUn = arregloUnidades.length;
+                                let esUnidadFinal = (unidadAsignada === totalUn);
+                                let esExamenFinal = /final|proyecto|integraci|examen/i.test(col.nom);
+                                
+                                if ((totalUn === 4 || totalUn === 5) && (esUnidadFinal || esExamenFinal)) {
+                                    let fInicioObj = parsearFechaMoodle(uObj.inicio);
+                                    if (fInicioObj) {
+                                        let diasExtra = (totalUn === 4) ? 14 : 35;
+                                        fLimite = new Date(fInicioObj.getTime() + (diasExtra * 24 * 60 * 60 * 1000));
+                                    }
+                                } else {
+                                    let fTermino = parsearFechaMoodle(textoTermino);
+                                    if (fTermino) fLimite = new Date(fTermino.getTime() + (7 * 24 * 60 * 60 * 1000));
+                                }
+                            } else {
+                                let fTermino = parsearFechaMoodle(textoTermino);
+                                if (fTermino) fLimite = new Date(fTermino.getTime() + (7 * 24 * 60 * 60 * 1000));
                             }
+
                             filasAImprimir.push({
                                 colNom: col.nom, statusForo: statusForo, faltan: faltan,
                                 totalAlumnos: totalAlumnos, rendimiento: Math.round((totalAlumnos-faltan)/totalAlumnos*100),
                                 fechasStr: fechasStr, textoTermino: textoTermino,
-                                estudiantesSinNota: estudiantesSinNota 
+                                estudiantesSinNota: estudiantesSinNota,
+                                fLimite: fLimite // 👈 Guardamos el límite real calculado
                             });
                         }
                     }
@@ -297,11 +317,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                         let cursoObj = { nombreCurso, pNombre, pCorreo, pAcceso, cAcceso, items: filasAImprimir };
                         let cursoFaltanNotas = filasAImprimir.some(item => {
                             if(item.faltan === 0) return false;
-                            let fTermino = parsearFechaMoodle(item.textoTermino);
-                            if(fTermino){
-                                let fLimite = new Date(fTermino.getTime() + (7 * 24 * 60 * 60 * 1000));
-                                if(new Date() < fLimite) return false; 
-                            }
+                            if(item.fLimite && new Date() < item.fLimite) return false; 
                             return true;
                         });
                         let cursoFaltaForo = filasAImprimir.some(item => item.statusForo.includes('❌ No'));
@@ -314,19 +330,13 @@ async function ejecutarExtractor(estudianteObjetivo){
                             if (numDias >= 7) sinAcceso7Dias = true;
                         }
                         
-                        // 👇 TEXTO EXPLICATIVO PARA CORREOS 👇
                         let textoExplicacionCeros = "En caso de haber revisado todos los trabajos, y que aun falten notas, es porque debe ingresar el 1,0 a aquellos estudiantes que no hayan entregado la evaluación. Esto se puede hacer a través de la rúbrica (marcando todos los puntajes mínimos) o editando el libro de calificaciones e ingresando directamente el 1,0 en aquellas casillas vacías.";
                         
-                        // 🛠️ CONSTRUCCIÓN INTELIGENTE DEL RESUMEN NUMÉRICO DE NOTAS FALTANTES 🛠️
                         let resumenNotasFaltantes = "";
                         filasAImprimir.forEach(item => {
                             if(item.faltan > 0) {
-                                let fTermino = parsearFechaMoodle(item.textoTermino);
                                 let pasoPlazo = true;
-                                if(fTermino){
-                                    let fLimite = new Date(fTermino.getTime() + (7 * 24 * 60 * 60 * 1000));
-                                    if(new Date() < fLimite) pasoPlazo = false; 
-                                }
+                                if(item.fLimite && new Date() < item.fLimite) pasoPlazo = false; 
                                 if(pasoPlazo) {
                                     resumenNotasFaltantes += `\n - ${item.colNom}: faltan ${item.faltan} estudiante${item.faltan > 1 ? 's' : ''}`;
                                 }
@@ -337,7 +347,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                         let listaPendientesMaestra = [];
                         if(sinAcceso7Dias) listaPendientesMaestra.push("- Regularizar su acceso a la plataforma (registra alerta de inactividad).");
                         if(cursoFaltaForo) listaPendientesMaestra.push("- Participación, respuesta o moderación en los foros de discusión.");
-                        if(cursoFaltanNotas) listaPendientesMaestra.push("- Ingreso de calificaciones pendientes en el libro de notas (plazo de una semana cumplido).");
+                        if(cursoFaltanNotas) listaPendientesMaestra.push("- Ingreso de calificaciones pendientes en el libro de notas (plazo de revisión cumplido).");
                         
                         if(listaPendientesMaestra.length > 0 && pCorreo.includes('@')) {
                             let subjTodo = encodeURIComponent(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
@@ -472,7 +482,8 @@ async function ejecutarExtractor(estudianteObjetivo){
                                  <td style='padding:10px;border:1px solid #bdc3c7;${estiloSeparador}'>${it.colNom} ${it.statusForo!=='No aplica'&&!it.statusForo.includes('No')?`(${it.statusForo})`:''}</td>
                                  <td style='padding:10px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;'>${it.notaTexto}</td></tr>`;
                     } else {
-                        let bgRendimiento = obtenerColorRendimiento(it.rendimiento, it.textoTermino);
+                        // 👇 Usamos la nueva propiedad fLimite para el color 👇
+                        let bgRendimiento = obtenerColorRendimiento(it.rendimiento, it.fLimite);
                         let btnDetalle = it.faltan > 0 
                             ? `<button onclick="window.mostrarEstudiantesSinNota('${encodeURIComponent(it.estudiantesSinNota.join('||'))}')" style="padding:4px 8px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:10px; font-weight:bold;">Ver Alumnos</button>` 
                             : `<span style="color:#7f8c8d;font-size:10px;">Completo</span>`;
