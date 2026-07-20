@@ -1,10 +1,10 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[52547,53519];
+const ids=[52547,53519,53736];
 /* 👆 TODOS TUS IDs CARGADOS 👆 */
 const coloresPastel=['#ffffff', '#fcfcfc'];
 
-// --- MODAL FLOTANTE PARA VER EL 100% DE LOS ALUMNOS ---
+// --- NUEVA FUNCIÓN PARA MODAL DE ESTUDIANTES ---
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
     let estudiantes = decodeURIComponent(datosCodificados).split('||');
     let listaHtml = estudiantes.map(e => `<li style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">👤 ${e}</li>`).join('');
@@ -26,58 +26,6 @@ window.mostrarEstudiantesSinNota = function(datosCodificados) {
         </div>
     `;
     document.body.appendChild(div);
-};
-
-// --- FUNCIÓN DE CORREO 100% AUTOMÁTICA CON LISTADO DIRECTO ACOTADO ---
-window.enviarCorreoAuditoria = function(idx, tipo) {
-    let curso = window.datosAuditoriaGlobal?.[idx];
-    if(!curso) return;
-    
-    let subject = "";
-    let body = "";
-    let LIMITE_ALUMNOS_EMAIL = 6; // Límite seguro para no romper el enlace del navegador
-    
-    // Construcción del listado en texto plano directo para el correo
-    let textoListadoEstudiantes = "";
-    let evalsConFaltantes = curso.items.filter(it => it.faltan > 0);
-    
-    if(evalsConFaltantes.length > 0) {
-        textoListadoEstudiantes = "\n\nDetalle de estudiantes sin calificar registrados:";
-        evalsConFaltantes.forEach(ev => {
-            textoListadoEstudiantes += `\n\nAsignación: ${ev.colNom}`;
-            let visibles = ev.estudiantesSinNota.slice(0, LIMITE_ALUMNOS_EMAIL);
-            visibles.forEach(est => {
-                textoListadoEstudiantes += `\n - ${est}`;
-            });
-            if(ev.estudiantesSinNota.length > LIMITE_ALUMNOS_EMAIL) {
-                let diferencia = ev.estudiantesSinNota.length - LIMITE_ALUMNOS_EMAIL;
-                textoListadoEstudiantes += `\n - ... y ${diferencia} estudiantes más en esta actividad.`;
-            }
-        });
-    }
-
-    if(tipo === 'todo') {
-        subject = `Recordatorio de Pendientes Urgentes - ${curso.nombreCurso}`;
-        let extraNotas = curso.cursoFaltanNotas ? `${textoListadoEstudiantes}\n\n${curso.textoExplicacionCeros}` : "";
-        body = `Estimado/a ${curso.pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${curso.nombreCurso}:\n\n${curso.listaPendientesMaestra.join('\n')}${extraNotas}\n\nLe recordamos la importancia de mantener estas actividades al día para el correcto seguimiento de nuestros estudiantes.\n\nQuedo atento/a ante cualquier duda o inconveniente técnico.\n\nSaludos cordiales.`;
-    }
-    else if(tipo === 'notas') {
-        subject = `Pendiente ingreso de calificaciones - ${curso.nombreCurso}`;
-        body = `Estimado/a ${curso.pNombre},\n\nJunto con saludar, le escribo para recordarle que existen calificaciones pendientes por ingresar en la asignatura ${curso.nombreCurso}.${textoListadoEstudiantes}\n\n${curso.textoExplicacionCeros}\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`;
-    }
-    else if(tipo === 'foro') {
-        subject = `Pendiente participación en foros - ${curso.nombreCurso}`;
-        body = `Estimado/a ${curso.pNombre},\n\nJunto con saludar, le escribo para recordarle que se encuentra pendiente su participación/moderación en los foros de la asignatura ${curso.nombreCurso}.\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`;
-    }
-    else if(tipo === 'acceso') {
-        subject = `Alerta de inactividad - ${curso.nombreCurso}`;
-        body = `Estimado/a ${curso.pNombre},\n\nJunto con saludar, le escribo debido a que el sistema registra que no ha ingresado a la plataforma por 7 días o más en la asignatura ${curso.nombreCurso}.\n\nLe recordamos la importancia de mantener una revisión constante para el buen desarrollo del curso.\n\nQuedo atento/a ante cualquier inconveniente técnico o personal.\n\nSaludos cordiales.`;
-    }
-    
-    let mailtoUrl = `mailto:${curso.pCorreo}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    let a = document.createElement('a');
-    a.href = mailtoUrl;
-    a.click();
 };
 
 function normalizarTexto(t){
@@ -154,7 +102,6 @@ function iniciarPanelUI(){
 async function ejecutarExtractor(estudianteObjetivo){
     let esBusquedaEstudiante=estudianteObjetivo!==null;
     let datosExtraidos = [];
-    window.datosAuditoriaGlobal = datosExtraidos;
     
     document.body.innerHTML=`<div style='position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:9999;padding:50px;font-family:sans-serif;text-align:center;'><h2>${esBusquedaEstudiante?'🔍 Buscando estudiante...':'🚀 Extractor General Activo'}</h2><div style='width:80%;background:#eee;height:20px;margin:20px auto;border-radius:10px;overflow:hidden;'><div id='p' style='width:0%;background:#2980b9;height:100%;transition:0.3s;'></div></div><p id='s'>Mapeando fechas y estructurando unidades...</p><p id='pct'>0%</p></div>`;
     
@@ -312,7 +259,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                     let filasAImprimir = [];
                     for(let col of colValidas){
                         let faltan=0,totalAlumnos=0;
-                        let estudiantesSinNota = []; 
+                        let estudiantesSinNota = []; // 👇 Extracción de estudiantes faltantes 👇
                         filasDatos.forEach(row=>{
                             let linkEstudiante = row.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
                             if(linkEstudiante){
@@ -342,13 +289,13 @@ async function ejecutarExtractor(estudianteObjetivo){
                                 colNom: col.nom, statusForo: statusForo, faltan: faltan,
                                 totalAlumnos: totalAlumnos, rendimiento: Math.round((totalAlumnos-faltan)/totalAlumnos*100),
                                 fechasStr: fechasStr, textoTermino: textoTermino,
-                                estudiantesSinNota: estudiantesSinNota 
+                                estudiantesSinNota: estudiantesSinNota // Guardado para la tabla
                             });
                         }
                     }
                     
                     if(filasAImprimir.length > 0) {
-                        let cAcceso = configuringColorAcceso(pAcceso);
+                        let cAcceso = configurarColorAcceso(pAcceso);
                         let cursoObj = { nombreCurso, pNombre, pCorreo, pAcceso, cAcceso, items: filasAImprimir };
                         let cursoFaltanNotas = filasAImprimir.some(item => {
                             if(item.faltan === 0) return false;
@@ -369,19 +316,38 @@ async function ejecutarExtractor(estudianteObjetivo){
                             if (numDias >= 7) sinAcceso7Dias = true;
                         }
                         
+                        // 👇 TEXTO EXPLICATIVO PARA CORREOS 👇
                         let textoExplicacionCeros = "En caso de haber revisado todos los trabajos, y que aun falten notas, es porque debe ingresar el 1,0 a aquellos estudiantes que no hayan entregado la evaluación. Esto se puede hacer a través de la rúbrica (marcando todos los puntajes mínimos) o editando el libro de calificaciones e ingresando directamente el 1,0 en aquellas casillas vacías.";
-                        
+
+                        let arrayBotones = [];
                         let listaPendientesMaestra = [];
                         if(sinAcceso7Dias) listaPendientesMaestra.push("- Regularizar su acceso a la plataforma (registra alerta de inactividad).");
                         if(cursoFaltaForo) listaPendientesMaestra.push("- Participación, respuesta o moderación en los foros de discusión.");
                         if(cursoFaltanNotas) listaPendientesMaestra.push("- Ingreso de calificaciones pendientes en el libro de notas (plazo de una semana cumplido).");
+                        if(listaPendientesMaestra.length > 0 && pCorreo.includes('@')) {
+                            let subjTodo = encodeURIComponent(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
+                            let extraText = cursoFaltanNotas ? `\n\n${textoExplicacionCeros}` : '';
+                            let bodyTodo = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}${extraText}\n\nLe recordamos la importancia de mantener estas actividades al día para el correcto seguimiento de nuestros estudiantes.\n\nQuedo atento/a ante cualquier duda o inconveniente técnico.\n\nSaludos cordiales.`);
+                            arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjTodo}&body=${bodyTodo}" style="display:inline-block;width:100px;padding:6px;background:#34495e;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;border:1px solid #2c3e50;">✉️ Todo Pendiente</a>`);
+                            arrayBotones.push(`<div style="height:4px; border-bottom:1px dashed #ccc; margin-bottom:4px;"></div>`);
+                        }
+                        if(cursoFaltanNotas && pCorreo.includes('@')) {
+                            let subjNotas = encodeURIComponent(`Pendiente ingreso de calificaciones - ${nombreCurso}`);
+                            let bodyNotas = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que existen calificaciones pendientes por ingresar en la asignatura ${nombreCurso}.\n\n${textoExplicacionCeros}\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
+                            arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjNotas}&body=${bodyNotas}" style="display:inline-block;width:100px;padding:6px;background:#e67e22;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;">✉️ Faltan Notas</a>`);
+                        }
+                        if(cursoFaltaForo && pCorreo.includes('@')) {
+                            let subjForo = encodeURIComponent(`Pendiente participación en foros - ${nombreCurso}`);
+                            let bodyForo = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que se encuentra pendiente su participación/moderación en los foros de la asignatura ${nombreCurso}.\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
+                            arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjForo}&body=${bodyForo}" style="display:inline-block;width:100px;padding:6px;background:#c0392b;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;">✉️ Falta Foro</a>`);
+                        }
+                        if(sinAcceso7Dias && pCorreo.includes('@')) {
+                            let subjAcceso = encodeURIComponent(`Alerta de inactividad - ${nombreCurso}`);
+                            let bodyAcceso = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo debido a que el sistema registra que no ha ingresado a la plataforma por 7 días o más en la asignatura ${nombreCurso}.\n\nLe recordamos la importancia de mantener una revisión constante para el buen desarrollo del curso.\n\nQuedo atento/a ante cualquier inconveniente técnico o personal.\n\nSaludos cordiales.`);
+                            arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjAcceso}&body=${bodyAcceso}" style="display:inline-block;width:100px;padding:6px;background:#8e44ad;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;">✉️ Sin Acceso</a>`);
+                        }
                         
-                        cursoObj.sinAcceso7Dias = sinAcceso7Dias;
-                        cursoObj.cursoFaltaForo = cursoFaltaForo;
-                        cursoObj.cursoFaltanNotas = cursoFaltanNotas;
-                        cursoObj.textoExplicacionCeros = textoExplicacionCeros;
-                        cursoObj.listaPendientesMaestra = listaPendientesMaestra;
-                        
+                        cursoObj.celdaAcciones = arrayBotones.join('<div style="height:6px;"></div>');
                         datosExtraidos.push(cursoObj);
                     }
                 }
@@ -402,6 +368,7 @@ async function ejecutarExtractor(estudianteObjetivo){
         </div>
     </div>`;
     
+    // 👇 NUEVA COLUMNA AÑADIDA AL FINAL: 'Detalle' 👇
     let titulosColumnas = esBusquedaEstudiante 
         ? ['Asignatura', 'Docente', 'Fechas Homologadas', 'Evaluación', 'Nota'] 
         : ['Asignatura', 'Docente', 'Correo', 'Último Acceso', 'Acciones Consolidadas', 'Fechas Homologadas', 'Evaluación', '¿Docente Participó?', 'Faltan', 'Alumnos', 'Rendimiento', 'Detalle'];
@@ -426,6 +393,7 @@ async function ejecutarExtractor(estudianteObjetivo){
             let table = document.getElementById('tablaAuditoria');
             let htmlTable = table.outerHTML;
             htmlTable = htmlTable.replace(/<input[^>]*>/gi, '');
+            // Remueve botones de exportación para limpiar el excel
             htmlTable = htmlTable.replace(/<button[^>]*>.*?<\/button>/gi, '');
             let blob = new Blob(['\ufeff' + htmlTable], { type: 'application/vnd.ms-excel' });
             let url = URL.createObjectURL(blob);
@@ -479,27 +447,11 @@ async function ejecutarExtractor(estudianteObjetivo){
                             html += `<td rowspan="${rs}" style='padding:12px;border:1px solid #bdc3c7;${estiloSeparador}font-weight:bold;'>${curso.nombreCurso}</td>
                                      <td rowspan="${rs}" style='padding:12px;border:1px solid #bdc3c7;${estiloSeparador}font-weight:bold;'>${curso.pNombre}</td>`;
                         } else {
-                            let arrayBotones = [];
-                            if(curso.listaPendientesMaestra.length > 0 && curso.pCorreo.includes('@')) {
-                                arrayBotones.push(`<button onclick="window.enviarCorreoAuditoria(${i}, 'todo')" style="display:inline-block;width:100px;padding:6px;background:#34495e;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Todo Pendiente</button>`);
-                                arrayBotones.push(`<div style="height:4px; border-bottom:1px dashed #ccc; margin-bottom:4px;"></div>`);
-                            }
-                            if(curso.cursoFaltanNotas && curso.pCorreo.includes('@')) {
-                                arrayBotones.push(`<button onclick="window.enviarCorreoAuditoria(${i}, 'notas')" style="display:inline-block;width:100px;padding:6px;background:#e67e22;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Faltan Notas</button>`);
-                            }
-                            if(curso.cursoFaltaForo && curso.pCorreo.includes('@')) {
-                                arrayBotones.push(`<button onclick="window.enviarCorreoAuditoria(${i}, 'foro')" style="display:inline-block;width:100px;padding:6px;background:#c0392b;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Falta Foro</button>`);
-                            }
-                            if(curso.sinAcceso7Dias && curso.pCorreo.includes('@')) {
-                                arrayBotones.push(`<button onclick="window.enviarCorreoAuditoria(${i}, 'acceso')" style="display:inline-block;width:100px;padding:6px;background:#8e44ad;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Sin Acceso</button>`);
-                            }
-                            let celdaAccionesHtml = arrayBotones.join('<div style="height:6px;"></div>');
-
                             html += `<td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}'>${curso.nombreCurso}</td>
                                      <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}font-weight:bold;'>${curso.pNombre}</td>
                                      <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}color:#2980b9;'>${curso.pCorreo}</td>
                                      <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}color:${curso.cAcceso};font-weight:bold;'>${curso.pAcceso}</td>
-                                     <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;vertical-align:middle;'>${celdaAccionesHtml}</td>`;
+                                     <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;vertical-align:middle;'>${curso.celdaAcciones}</td>`;
                         }
                     }
                     if(esBusquedaEstudiante) {
@@ -508,9 +460,11 @@ async function ejecutarExtractor(estudianteObjetivo){
                                  <td style='padding:10px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;'>${it.notaTexto}</td></tr>`;
                     } else {
                         let bgRendimiento = obtenerColorRendimiento(it.rendimiento, it.textoTermino);
+                        // 👇 INYECCIÓN DEL BOTÓN DE DETALLE DE ALUMNOS FALTANTES 👇
                         let btnDetalle = it.faltan > 0 
                             ? `<button onclick="window.mostrarEstudiantesSinNota('${encodeURIComponent(it.estudiantesSinNota.join('||'))}')" style="padding:4px 8px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:10px; font-weight:bold;">Ver Alumnos</button>` 
                             : `<span style="color:#7f8c8d;font-size:10px;">Completo</span>`;
+
                         html += `<td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}font-size:11px;'>${it.fechasStr}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}'>${it.colNom}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${it.statusForo}</td>
