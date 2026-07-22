@@ -27,7 +27,6 @@ window.mostrarEstudiantesSinNota = function(datosCodificados) {
     document.body.appendChild(div);
 };
 
-// NUEVA FUNCIÓN: Genera un correo seguro, acortando dinámicamente si supera los 1900 caracteres.
 window.enviarCorreoSeguro = function(correo, asuntoCodificado, introCod, detallesCod, explicacionCod, despedidaCod) {
     let asunto = decodeURIComponent(asuntoCodificado);
     let intro = decodeURIComponent(introCod);
@@ -37,7 +36,6 @@ window.enviarCorreoSeguro = function(correo, asuntoCodificado, introCod, detalle
     
     let armarMailto = (cuerpoTexto) => `mailto:${correo}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpoTexto)}`;
     
-    // Fase 1: Intentar enviar todo completo
     let cuerpoCompleto = intro + detalles + explicacion + despedida;
     let urlCompleta = armarMailto(cuerpoCompleto);
     
@@ -46,7 +44,6 @@ window.enviarCorreoSeguro = function(correo, asuntoCodificado, introCod, detalle
         return;
     }
     
-    // Fase 2: Cortar la explicación larga de los ceros
     let cuerpoSinExplicacion = intro + detalles + despedida;
     let urlSinExplicacion = armarMailto(cuerpoSinExplicacion);
     
@@ -55,7 +52,6 @@ window.enviarCorreoSeguro = function(correo, asuntoCodificado, introCod, detalle
         return;
     }
     
-    // Fase 3: Cortar el detalle y enviar un resumen genérico
     let resumenDetalles = detalles ? "\n\n(Existen múltiples actividades con calificaciones pendientes. Por favor, revise detalladamente el libro de calificaciones)." : "";
     let cuerpoResumido = intro + resumenDetalles + despedida;
     
@@ -65,6 +61,18 @@ window.enviarCorreoSeguro = function(correo, asuntoCodificado, introCod, detalle
 function normalizarTexto(t){
     return t?t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim():"";
 }
+
+// NUEVA FUNCIÓN AJUSTADA: Solo resume Formativas y Sumativas.
+function generarNombreCorto(nom, unidad) {
+    let n = nom.toLowerCase();
+    if(n.includes("formativa")) return `Act. Formativa U${unidad}`;
+    if(n.includes("sumativa")) return `Act. Sumativa U${unidad}`;
+    
+    // Para el resto de actividades (foros, proyectos, integraciones, etc.), conservamos el nombre
+    // Solo lo cortamos si supera los 35 caracteres para no saturar la tabla o el correo.
+    return nom.length > 35 ? nom.substring(0,32) + "..." : nom;
+}
+
 function parsearFechaMoodle(texto) {
     if (!texto || /cierre/i.test(texto)) return null;
     let t = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -260,7 +268,8 @@ async function ejecutarExtractor(estudianteObjetivo){
                 Array.from(filaMaestra.cells).forEach((celda,idx)=>{
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
                     let nomMin=nom.toLowerCase();
-                    if(/foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin) && !/total|promedio|ad:|diagnostica|diagnóstica|repetición|repeticion/i.test(nomMin)){
+                    // 👇 ACTUALIZADO: Se excluyen explícitamente "nota final", "calificación final" y "calificacion final" 👇
+                    if(/foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin) && !/total|promedio|ad:|diagnostica|diagnóstica|repetición|repeticion|nota final|calificaci[oó]n final/i.test(nomMin)){
                         let linkActividad=celda.querySelector('a[href*="mod/"]');
                         let actId = null;
                         if (linkActividad) {
@@ -285,12 +294,16 @@ async function ejecutarExtractor(estudianteObjetivo){
                             if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
                             
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
+                            
+                            // Transformar a nombre corto
+                            let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
+
                             let fechasStr = "No especificada";
                             if (arregloUnidades[unidadAsignada - 1]) {
                                 let uObj = arregloUnidades[unidadAsignada - 1];
                                 fechasStr = `<b>Inicio:</b> ${uObj.inicio}<br><b>Término:</b> ${uObj.termino}`;
                             }
-                            cursoObj.items.push({ colNom: col.nom, statusForo, notaTexto, fechasStr });
+                            cursoObj.items.push({ colNom: nombreCorto, statusForo, notaTexto, fechasStr });
                         }
                         if(cursoObj.items.length > 0) datosExtraidos.push(cursoObj);
                     }
@@ -317,6 +330,10 @@ async function ejecutarExtractor(estudianteObjetivo){
                             if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
                             
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
+                            
+                            // Transformar a nombre corto
+                            let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
+
                             let fechasStr = "No especificada";
                             let textoTermino = "Cierre del curso";
                             let fLimite = null;
@@ -346,7 +363,8 @@ async function ejecutarExtractor(estudianteObjetivo){
                             }
 
                             filasAImprimir.push({
-                                colNom: col.nom, statusForo: statusForo, faltan: faltan,
+                                colNom: nombreCorto, // Ahora se muestra el nombre corto tanto en UI como en correos
+                                statusForo: statusForo, faltan: faltan,
                                 totalAlumnos: totalAlumnos, rendimiento: Math.round((totalAlumnos-faltan)/totalAlumnos*100),
                                 fechasStr: fechasStr, textoTermino: textoTermino,
                                 estudiantesSinNota: estudiantesSinNota,
@@ -401,7 +419,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                         if(cursoFaltaForo) listaPendientesMaestra.push("- Participación, respuesta o moderación en los foros de discusión.");
                         if(tieneNotasParaTodoPendiente) listaPendientesMaestra.push("- Ingreso de calificaciones pendientes en el libro de notas (plazo de revisión cumplido).");
                         
-                        // 👇 NUEVA LÓGICA DE BOTONES SEGUROS (MAILTO DINÁMICO) 👇
                         if(listaPendientesMaestra.length > 0 && pCorreo.includes('@')) {
                             let subjTodo = encodeURIComponent(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
                             let intro = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}`);
