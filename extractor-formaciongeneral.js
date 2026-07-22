@@ -1,8 +1,9 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[52547,53519,53736,53524,53802,53525,53535,53157,53161,53166,52429,52087,53526,53536,51266,52122,53673,53527,53537,53554,52581,52575,53520,53528,53158,51730,51719,51720,53529,53538,53521,53530,53539,53562,53159,53162,52552,50920,53522,53531,53540,53549,53556,51517,51274,53523,53532,53550,52750,53163,50919,50921,53533,53542,51581,53164,52751,52607,52752,52428,52559,53683,53534,53543,53552,53803];
+const ids=[,53158,51730,51719,51720,53529,53538,53521,53530,53539,53562,53159,53162,52552,50920,53522,53531,53540,53549,53556,51517,51274,53523,53532,53550,52750,53163,50919];
 /* 👆 TODOS TUS IDs CARGADOS 👆 */
 const coloresPastel=['#ffffff', '#fcfcfc'];
+
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
     let estudiantes = decodeURIComponent(datosCodificados).split('||');
     let listaHtml = estudiantes.map(e => `<li style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">👤 ${e}</li>`).join('');
@@ -25,6 +26,27 @@ window.mostrarEstudiantesSinNota = function(datosCodificados) {
     `;
     document.body.appendChild(div);
 };
+
+// NUEVA FUNCIÓN: Genera un archivo .eml para saltarse el límite de caracteres
+window.abrirCorreoAutomatico = function(correo, asuntoCodificado, cuerpoCodificado) {
+    let asunto = decodeURIComponent(asuntoCodificado);
+    let cuerpo = decodeURIComponent(cuerpoCodificado);
+    
+    // Formato estándar de un archivo de correo electrónico (RFC 822)
+    // El 'X-Unsent: 1' le dice a Outlook/Apple Mail que lo abra como borrador listo para enviar
+    let contenidoEml = `To: ${correo}\r\nSubject: ${asunto}\r\nX-Unsent: 1\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${cuerpo}`;
+    
+    let blob = new Blob([contenidoEml], { type: 'message/rfc822' });
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement('a');
+    a.href = url;
+    a.download = `Borrador_${correo.split('@')[0]}.eml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+};
+
 function normalizarTexto(t){
     return t?t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim():"";
 }
@@ -210,7 +232,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                 });
             }
             
-            // 👇 Lógica de Ciclo 👇
             let cicloAsignatura = "-";
             if (arregloUnidades.length > 0 && arregloUnidades[0].inicio) {
                 let fInicioPrimera = parsearFechaMoodle(arregloUnidades[0].inicio);
@@ -341,9 +362,8 @@ async function ejecutarExtractor(estudianteObjetivo){
                         
                         let textoExplicacionCeros = "En caso de haber revisado todos los trabajos, y que aun falten notas, es porque debe ingresar el 1,0 a aquellos estudiantes que no hayan entregado la evaluación. Esto se puede hacer a través de la rúbrica (marcando todos los puntajes mínimos) o editando el libro de calificaciones e ingresando directamente el 1,0 en aquellas casillas vacías.";
                         
-                        // 👇 Lógica para segmentar Formativas vs Todo Pendiente 👇
-                        let resumenNotasFaltantes = ""; // Va para el correo exclusivo de Notas (Muestra Todo)
-                        let resumenNotasTodoPendiente = ""; // Va para el correo Todo Pendiente (Sin Formativas)
+                        let resumenNotasFaltantes = ""; 
+                        let resumenNotasTodoPendiente = ""; 
                         let tieneNotasParaTodoPendiente = false;
 
                         filasAImprimir.forEach(item => {
@@ -352,7 +372,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                                 if(item.fLimite && new Date() < item.fLimite) pasoPlazo = false; 
                                 if(pasoPlazo) {
                                     let textoLinea = `\n - ${item.colNom}: faltan ${item.faltan} estudiante${item.faltan > 1 ? 's' : ''}`;
-                                    resumenNotasFaltantes += textoLinea; // Agrega a ambas siempre que pase el plazo
+                                    resumenNotasFaltantes += textoLinea;
                                     
                                     if(!/formativa/i.test(item.colNom)) {
                                         resumenNotasTodoPendiente += textoLinea;
@@ -368,29 +388,28 @@ async function ejecutarExtractor(estudianteObjetivo){
                         if(cursoFaltaForo) listaPendientesMaestra.push("- Participación, respuesta o moderación en los foros de discusión.");
                         if(tieneNotasParaTodoPendiente) listaPendientesMaestra.push("- Ingreso de calificaciones pendientes en el libro de notas (plazo de revisión cumplido).");
                         
-                        // Botón "Todo Pendiente" (Usa resumenNotasTodoPendiente excluyendo formativas)
+                        // 👇 REEMPLAZO DE MODAL POR LA FUNCIÓN DE DESCARGA AUTO EML 👇
                         if(listaPendientesMaestra.length > 0 && pCorreo.includes('@')) {
                             let subjTodo = encodeURIComponent(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
                             let extraText = tieneNotasParaTodoPendiente ? `\n\nActividades con calificaciones pendientes:${resumenNotasTodoPendiente}\n\n${textoExplicacionCeros}` : '';
                             let bodyTodo = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}${extraText}\n\nLe recordamos la importancia de mantener estas actividades al día para el correcto seguimiento de nuestros estudiantes.\n\nQuedo atento/a ante cualquier duda o inconveniente técnico.\n\nSaludos cordiales.`);
-                            arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjTodo}&body=${bodyTodo}" style="display:inline-block;width:100px;padding:6px;background:#34495e;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;border:1px solid #2c3e50;">✉️ Todo Pendiente</a>`);
+                            arrayBotones.push(`<button onclick="window.abrirCorreoAutomatico('${pCorreo}', '${subjTodo}', '${bodyTodo}')" style="display:inline-block;width:100px;padding:6px;background:#34495e;color:white;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;border:1px solid #2c3e50;cursor:pointer;">✉️ Todo Pendiente</button>`);
                             arrayBotones.push(`<div style="height:4px; border-bottom:1px dashed #ccc; margin-bottom:4px;"></div>`);
                         }
-                        // Botón "Faltan Notas" (Usa resumenNotasFaltantes donde va TODO)
                         if(cursoFaltanNotas && pCorreo.includes('@')) {
                             let subjNotas = encodeURIComponent(`Pendiente ingreso de calificaciones - ${nombreCurso}`);
                             let bodyNotas = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que existen calificaciones pendientes por ingresar en la asignatura ${nombreCurso}:\n${resumenNotasFaltantes}\n\n${textoExplicacionCeros}\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
-                            arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjNotas}&body=${bodyNotas}" style="display:inline-block;width:100px;padding:6px;background:#e67e22;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;">✉️ Faltan Notas</a>`);
+                            arrayBotones.push(`<button onclick="window.abrirCorreoAutomatico('${pCorreo}', '${subjNotas}', '${bodyNotas}')" style="display:inline-block;width:100px;padding:6px;background:#e67e22;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Faltan Notas</button>`);
                         }
                         if(cursoFaltaForo && pCorreo.includes('@')) {
                             let subjForo = encodeURIComponent(`Pendiente participación en foros - ${nombreCurso}`);
                             let bodyForo = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que se encuentra pendiente su participación/moderación en los foros de la asignatura ${nombreCurso}.\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
-                            arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjForo}&body=${bodyForo}" style="display:inline-block;width:100px;padding:6px;background:#c0392b;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;">✉️ Falta Foro</a>`);
+                            arrayBotones.push(`<button onclick="window.abrirCorreoAutomatico('${pCorreo}', '${subjForo}', '${bodyForo}')" style="display:inline-block;width:100px;padding:6px;background:#c0392b;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Falta Foro</button>`);
                         }
                         if(sinAcceso7Dias && pCorreo.includes('@')) {
                             let subjAcceso = encodeURIComponent(`Alerta de inactividad - ${nombreCurso}`);
                             let bodyAcceso = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo debido a que el sistema registra que no ha ingresado a la plataforma por 7 días o más en la asignatura ${nombreCurso}.\n\nLe recordamos la importancia de mantener una revisión constante para el buen desarrollo del curso.\n\nQuedo atento/a ante cualquier inconveniente técnico o personal.\n\nSaludos cordiales.`);
-                            arrayBotones.push(`<a href="mailto:${pCorreo}?subject=${subjAcceso}&body=${bodyAcceso}" style="display:inline-block;width:100px;padding:6px;background:#8e44ad;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;">✉️ Sin Acceso</a>`);
+                            arrayBotones.push(`<button onclick="window.abrirCorreoAutomatico('${pCorreo}', '${subjAcceso}', '${bodyAcceso}')" style="display:inline-block;width:100px;padding:6px;background:#8e44ad;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Sin Acceso</button>`);
                         }
                         
                         cursoObj.celdaAcciones = arrayBotones.join('<div style="height:6px;"></div>');
@@ -414,7 +433,6 @@ async function ejecutarExtractor(estudianteObjetivo){
         </div>
     </div>`;
     
-    // 👇 Nuevas columnas añadidas a la vista principal y estudiante 👇
     let titulosColumnas = esBusquedaEstudiante 
         ? ['Asignatura', 'Ciclo', 'Docente', 'Fechas Homologadas', 'Evaluación', 'Nota'] 
         : ['Asignatura', 'Ciclo', 'Docente', 'Correo', 'Último Acceso', 'Acciones Consolidadas', 'Fechas Homologadas', 'Evaluación', '¿Docente Participó?', 'Faltan', 'Alumnos', 'Rendimiento', 'Detalle'];
