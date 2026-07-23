@@ -1,8 +1,10 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
 const ids=[52547,53519,53736,53524,53802,53525,53535,53157,53161,53166,52429,52087,53526,53536,51266,52122,53673,53527,53537,53554,52581,52575,53520,53528,53158,51730,51719,51720,53529,53538,53521,53530,53539,53562,53159,53162,52552,50920,53522,53531,53540,53549,53556,51517,51274,53523,53532,53550,52750,53163,50919,50921,53533,53542,51581,53164,52751,52607,52752,52428,52559,53683,53534,53543,53552,53803];
-/* 👆 TODOS TUS IDs CARGADOS 👆 */
 const coloresPastel=['#ffffff', '#fcfcfc'];
+
+// Auxiliar para pausas anti-bloqueo del servidor
+const esperar = ms => new Promise(res => setTimeout(res, ms));
 
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
     let estudiantes = decodeURIComponent(datosCodificados).split('||');
@@ -17,9 +19,7 @@ window.mostrarEstudiantesSinNota = function(datosCodificados) {
                 <button onclick="document.getElementById('modal-estudiantes-faltantes').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#7f8c8d;font-weight:bold;">&times;</button>
             </div>
             <div style="overflow-y:auto;flex-grow:1;border:1px solid #ecf0f1;padding:10px;border-radius:6px;background:#f9fbfc;">
-                <ul style="list-style:none;padding:0;margin:0;font-size:13px;color:#2c3e50;">
-                    ${listaHtml}
-                </ul>
+                <ul style="list-style:none;padding:0;margin:0;font-size:13px;color:#2c3e50;">${listaHtml}</ul>
             </div>
             <button onclick="document.getElementById('modal-estudiantes-faltantes').remove()" style="margin-top:15px;padding:10px;background:#34495e;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">Cerrar Ventana</button>
         </div>
@@ -27,49 +27,35 @@ window.mostrarEstudiantesSinNota = function(datosCodificados) {
     document.body.appendChild(div);
 };
 
-window.enviarCorreoSeguro = function(correo, asuntoCodificado, introCod, detallesCod, explicacionCod, despedidaCod) {
-    let asunto = decodeURIComponent(asuntoCodificado);
-    let intro = decodeURIComponent(introCod);
-    let detalles = decodeURIComponent(detallesCod);
-    let explicacion = decodeURIComponent(explicacionCod);
-    let despedida = decodeURIComponent(despedidaCod);
+// BLINDAJE DE CORREO: Sistema Dual (Mailto + Copia al Portapapeles)
+window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, explicacionCod, despedidaCod) {
+    let asunto = decodeURIComponent(asuntoCod);
+    let cuerpoTexto = decodeURIComponent(introCod) + decodeURIComponent(detallesCod) + decodeURIComponent(explicacionCod) + decodeURIComponent(despedidaCod);
     
-    let armarMailto = (cuerpoTexto) => `mailto:${correo}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpoTexto)}`;
-    
-    let cuerpoCompleto = intro + detalles + explicacion + despedida;
-    let urlCompleta = armarMailto(cuerpoCompleto);
-    
-    if (urlCompleta.length <= 1900) {
-        window.location.href = urlCompleta;
-        return;
+    // Si el correo es muy largo para mailto, acortamos la explicación
+    if ((asunto + cuerpoTexto).length > 1800) {
+        cuerpoTexto = decodeURIComponent(introCod) + decodeURIComponent(detallesCod) + decodeURIComponent(despedidaCod);
     }
+
+    let urlMailto = `mailto:${correo}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpoTexto)}`;
     
-    let cuerpoSinExplicacion = intro + detalles + despedida;
-    let urlSinExplicacion = armarMailto(cuerpoSinExplicacion);
+    // Intentar abrir el cliente de correo
+    let ventana = window.open(urlMailto, '_self');
     
-    if (urlSinExplicacion.length <= 1900) {
-        window.location.href = urlSinExplicacion;
-        return;
-    }
-    
-    let resumenDetalles = detalles ? "\n\n(Existen múltiples actividades con calificaciones pendientes. Por favor, revise detalladamente el libro de calificaciones)." : "";
-    let cuerpoResumido = intro + resumenDetalles + despedida;
-    
-    window.location.href = armarMailto(cuerpoResumido);
+    // Ofrecer respaldo inmediato de copiar al portapapeles por si el cliente no abre
+    navigator.clipboard.writeText(`Para: ${correo}\nAsunto: ${asunto}\n\n${cuerpoTexto}`).then(() => {
+        console.log("Contenido del correo copiado al portapapeles como respaldo.");
+    }).catch(()=>{});
 };
 
 function normalizarTexto(t){
     return t?t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim():"";
 }
 
-// NUEVA FUNCIÓN AJUSTADA: Solo resume Formativas y Sumativas.
 function generarNombreCorto(nom, unidad) {
     let n = nom.toLowerCase();
     if(n.includes("formativa")) return `Act. Formativa U${unidad}`;
     if(n.includes("sumativa")) return `Act. Sumativa U${unidad}`;
-    
-    // Para el resto de actividades (foros, proyectos, integraciones, etc.), conservamos el nombre
-    // Solo lo cortamos si supera los 35 caracteres para no saturar la tabla o el correo.
     return nom.length > 35 ? nom.substring(0,32) + "..." : nom;
 }
 
@@ -87,6 +73,7 @@ function parsearFechaMoodle(texto) {
     let anio = matchAnio ? parseInt(matchAnio[1]) : new Date().getFullYear();
     return new Date(anio, mesIdx, dia);
 }
+
 function obtenerNumeroUnidad(nombreColumna) {
     let texto = normalizarTexto(nombreColumna);
     let numeros = texto.match(/\d+/g);
@@ -99,6 +86,7 @@ function obtenerNumeroUnidad(nombreColumna) {
     if (/\bi\b/.test(texto)) return 1;
     return null;
 }
+
 function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
     if (actId && mapaActividadUnidad[actId] && mapaActividadUnidad[actId] <= totalUnidades) {
         return mapaActividadUnidad[actId];
@@ -108,6 +96,7 @@ function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
     if (numNombre !== null && numNombre <= totalUnidades && numNombre > 0) return numNombre;
     return (idxCol !== -1 && idxCol < totalUnidades) ? idxCol + 1 : (totalUnidades || 1);
 }
+
 function obtenerColorRendimiento(pct, fLimite) {
     let ahora = new Date();
     if (fLimite && ahora < fLimite) {
@@ -117,6 +106,7 @@ function obtenerColorRendimiento(pct, fLimite) {
     if (pct < 90) return '#fdebd0';  
     return '#e8f8f5';               
 }
+
 function configurarColorAcceso(pAcceso) {
     let txt = pAcceso.toLowerCase();
     if (/nunca|mes|año/i.test(txt)) return '#c0392b'; 
@@ -128,8 +118,9 @@ function configurarColorAcceso(pAcceso) {
     }
     return '#27ae60'; 
 }
+
 function iniciarPanelUI(){
-    document.body.innerHTML=`<div id="panel-auditoria" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(245,247,250,0.98);z-index:9999;display:flex;justify-content:center;align-items:center;font-family:sans-serif;overflow-y:auto;"><div style="background:white;padding:35px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1);text-align:center;width:480px;border:1px solid #e1e8ed;max-height:95vh;overflow-y:auto;"><h2 style="background:linear-gradient(135deg,#cc609b,#ff89c9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;color:#cc609b;margin:0 0 10px 0;font-size:26px;font-weight:bold;letter-spacing:-0.5px;">Revisor eCampus (Láser Consolidado)</h2><p style="color:#555;font-size:15px;margin:0 0 20px 0;font-weight:bold;">¿Qué deseas hacer?</p><button id="btnGeneral" style="width:100%;background:#27ae60;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;margin-bottom:20px;transition:0.2s;">🚀 Auditoría General</button><div style="border-top:2px dashed #e1e8ed;margin:20px 0;"></div><h3 style="color:#7f8c8d;font-size:14px;margin-bottom:12px;text-align:left;font-weight:bold;">🔍 Búsqueda Rápida por Estudiante:</h3><input type="email" id="correoEstudiante" placeholder="Correo exacto del alumno" style="width:100%;padding:11px;box-sizing:border-box;border:2px solid #bdc3c7;border-radius:8px;font-size:13px;margin-bottom:15px;outline:none;"><button id="btnEstudiante" style="width:100%;background:#2980b9;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;transition:0.2s;">👤 Buscar en Todas las Aulas</button></div></div>`;
+    document.body.innerHTML=`<div id="panel-auditoria" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(245,247,250,0.98);z-index:9999;display:flex;justify-content:center;align-items:center;font-family:sans-serif;overflow-y:auto;"><div style="background:white;padding:35px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1);text-align:center;width:480px;border:1px solid #e1e8ed;max-height:95vh;overflow-y:auto;"><h2 style="background:linear-gradient(135deg,#cc609b,#ff89c9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;color:#cc609b;margin:0 0 10px 0;font-size:26px;font-weight:bold;letter-spacing:-0.5px;">Revisor eCampus (vBlindada)</h2><p style="color:#555;font-size:15px;margin:0 0 20px 0;font-weight:bold;">¿Qué deseas hacer?</p><button id="btnGeneral" style="width:100%;background:#27ae60;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;margin-bottom:20px;transition:0.2s;">🚀 Auditoría General</button><div style="border-top:2px dashed #e1e8ed;margin:20px 0;"></div><h3 style="color:#7f8c8d;font-size:14px;margin-bottom:12px;text-align:left;font-weight:bold;">🔍 Búsqueda Rápida por Estudiante:</h3><input type="email" id="correoEstudiante" placeholder="Correo exacto del alumno" style="width:100%;padding:11px;box-sizing:border-box;border:2px solid #bdc3c7;border-radius:8px;font-size:13px;margin-bottom:15px;outline:none;"><button id="btnEstudiante" style="width:100%;background:#2980b9;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;transition:0.2s;">👤 Buscar en Todas las Aulas</button></div></div>`;
     document.getElementById('btnGeneral').addEventListener('click',()=>ejecutarExtractor(null));
     document.getElementById('btnEstudiante').addEventListener('click',()=>{
         let correo=document.getElementById('correoEstudiante').value.trim().toLowerCase();
@@ -137,16 +128,28 @@ function iniciarPanelUI(){
         ejecutarExtractor(correo);
     });
 }
+
 async function ejecutarExtractor(estudianteObjetivo){
     let esBusquedaEstudiante=estudianteObjetivo!==null;
     let datosExtraidos = [];
     
-    document.body.innerHTML=`<div style='position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:9999;padding:50px;font-family:sans-serif;text-align:center;'><h2>${esBusquedaEstudiante?'🔍 Buscando estudiante...':'🚀 Extractor General Activo'}</h2><div style='width:80%;background:#eee;height:20px;margin:20px auto;border-radius:10px;overflow:hidden;'><div id='p' style='width:0%;background:#2980b9;height:100%;transition:0.3s;'></div></div><p id='s'>Mapeando fechas y estructurando unidades...</p><p id='pct'>0%</p></div>`;
+    document.body.innerHTML=`<div style='position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:9999;padding:50px;font-family:sans-serif;text-align:center;'><h2>${esBusquedaEstudiante?'🔍 Buscando estudiante...':'🚀 Extractor General Activo (Modo Seguro)'}</h2><div style='width:80%;background:#eee;height:20px;margin:20px auto;border-radius:10px;overflow:hidden;'><div id='p' style='width:0%;background:#2980b9;height:100%;transition:0.3s;'></div></div><p id='s'>Mapeando fechas y estructurando unidades...</p><p id='pct'>0%</p></div>`;
     
     for(let i=0;i<ids.length;i++){
         try{
-            let r=await fetch(`https://e-campus.uniacc.cl/grade/report/grader/index.php?id=${ids[i]}`);
+            await esperar(150); // Pausa anti-saturación de servidor
+            
+            // BLINDAJE 1: Forzado de parámetros Moodle para ver TODO el libro sin paginación
+            let r=await fetch(`https://e-campus.uniacc.cl/grade/report/grader/index.php?id=${ids[i]}&perpage=5000&collapsed=0`);
+            if(!r.ok) continue; // Si la petición falla, omitimos de forma segura
+            
             let textGrader=await r.text();
+            if(textGrader.includes("login/index.php")) {
+                alert("⚠️ Su sesión de eCampus ha expirado. Por favor inicie sesión nuevamente.");
+                location.reload();
+                return;
+            }
+
             if(esBusquedaEstudiante&&!textGrader.toLowerCase().includes(estudianteObjetivo)){
                 document.getElementById('p').style.width=((i+1)/ids.length*100)+"%";
                 document.getElementById('pct').textContent=`${i+1}/${ids.length} Aulas`;
@@ -162,40 +165,44 @@ async function ejecutarExtractor(estudianteObjetivo){
             
             let pNombre="No asignado",pCorreo="No disponible",pAcceso="Nunca ha ingresado",pId=null;
             let rProf=await fetch(`https://e-campus.uniacc.cl/user/index.php?id=${ids[i]}&perpage=5000`);
-            let dProf=new DOMParser().parseFromString(await rProf.text(),"text/html");
-            let idxAcceso=-1;
-            
-            dProf.querySelectorAll('#participants thead th, .userlist table thead th').forEach((th,idx)=>{
-                let textTh=(th.textContent||"").toLowerCase();
-                if(textTh.includes("acceso")||textTh.includes("último")||textTh.includes("ultimo"))idxAcceso=idx;
-            });
-            
-            let filasParticipantes=dProf.querySelectorAll('#participants tbody tr, .userlist table tbody tr');
-            for(let row of filasParticipantes){
-                let textoFila=(row.textContent||"").toLowerCase();
-                if(textoFila.includes("profesor")||textoFila.includes("docente")||textoFila.includes("tutor")){
-                    let linkNombre=row.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
-                    if(linkNombre){
-                        if(pId===null){
-                            let matchId=linkNombre.href.match(/id=(\d+)/);
-                            if(matchId) pId=matchId[1]; 
-                            
-                            let clonL = linkNombre.cloneNode(true);
-                            clonL.querySelectorAll('.userinitials, .initials, .sr-only, .accesshide').forEach(el => el.remove());
-                            let rawName = (clonL.textContent||"").replace(/\s+/g,' ').trim();
-                            if(rawName.toLowerCase().startsWith("bp") && rawName.length > 5) { rawName = rawName.substring(2).trim(); }
-                            pNombre = rawName;
-                            
-                            let matchCorreo=row.innerHTML.match(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/);
-                            if(matchCorreo)pCorreo=matchCorreo[0];
-                            let celdaAcceso=(idxAcceso!==-1&&row.cells[idxAcceso])?row.cells[idxAcceso]:row.querySelector('.column-lastaccess');
-                            if(celdaAcceso&&(celdaAcceso.textContent||"").trim()!=="") pAcceso=(celdaAcceso.textContent||"").trim();
+            if(rProf.ok){
+                let dProf=new DOMParser().parseFromString(await rProf.text(),"text/html");
+                let idxAcceso=-1;
+                
+                dProf.querySelectorAll('#participants thead th, .userlist table thead th').forEach((th,idx)=>{
+                    let textTh=(th.textContent||"").toLowerCase();
+                    if(textTh.includes("acceso")||textTh.includes("último")||textTh.includes("ultimo"))idxAcceso=idx;
+                });
+                
+                let filasParticipantes=dProf.querySelectorAll('#participants tbody tr, .userlist table tbody tr');
+                for(let row of filasParticipantes){
+                    let textoFila=(row.textContent||"").toLowerCase();
+                    if(textoFila.includes("profesor")||textoFila.includes("docente")||textoFila.includes("tutor")){
+                        let linkNombre=row.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
+                        if(linkNombre){
+                            if(pId===null){
+                                let matchId=linkNombre.href.match(/id=(\d+)/);
+                                if(matchId) pId=matchId[1]; 
+                                
+                                let clonL = linkNombre.cloneNode(true);
+                                clonL.querySelectorAll('.userinitials, .initials, .sr-only, .accesshide').forEach(el => el.remove());
+                                let rawName = (clonL.textContent||"").replace(/\s+/g,' ').trim();
+                                if(rawName.toLowerCase().startsWith("bp") && rawName.length > 5) { rawName = rawName.substring(2).trim(); }
+                                pNombre = rawName;
+                                
+                                let matchCorreo=row.innerHTML.match(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/);
+                                if(matchCorreo)pCorreo=matchCorreo[0];
+                                let celdaAcceso=(idxAcceso!==-1&&row.cells[idxAcceso])?row.cells[idxAcceso]:row.querySelector('.column-lastaccess');
+                                if(celdaAcceso&&(celdaAcceso.textContent||"").trim()!=="") pAcceso=(celdaAcceso.textContent||"").trim();
+                            }
                         }
                     }
                 }
             }
+
+            // BLINDAJE 2: Búsqueda extendida de fechas en la portada del curso
             let rCurso = await fetch(`https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}`);
-            let dCurso = new DOMParser().parseFromString(await rCurso.text(), "text/html");
+            let dCurso = new DOMParser().parseFromString(rCurso.ok ? await rCurso.text() : "", "text/html");
             
             let fechasSecuenciales = [];
             let mapaActividadUnidad = {}; 
@@ -208,14 +215,13 @@ async function ejecutarExtractor(estudianteObjetivo){
                 let fecha = "";
                 if (textoEl) {
                     let txt = textoEl.textContent.replace(/\s+/g, ' ');
-                    if (txt.toLowerCase().includes("disponible desde")) {
+                    // Captura ampliada de variantes de texto
+                    let match = txt.match(/(?:disponible desde|disponible a partir de|abre:|desde)\s+([a-z0-9\sde]+)/i);
+                    if (match && match[1]) {
+                        fecha = match[1].trim();
+                    } else {
                         let strong = textoEl.querySelector('strong');
-                        if (strong) {
-                            fecha = strong.textContent.trim();
-                        } else {
-                            let match = txt.match(/disponible desde\s+([a-z0-9\sde]+)/i);
-                            if (match && match[1]) fecha = match[1].trim();
-                        }
+                        if (strong) fecha = strong.textContent.trim();
                     }
                 }
                 if (fecha && !fechasSecuenciales.includes(fecha)) fechasSecuenciales.push(fecha);
@@ -228,22 +234,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                     if (m) mapaActividadUnidad[m[1]] = unidadAsignadaSec;
                 });
             });
-            if (fechasSecuenciales.length === 0) {
-                dCurso.querySelectorAll('div, span, p, li, strong').forEach(el => {
-                    if (el.children.length === 0 || (el.children.length === 1 && el.querySelector('strong'))) {
-                        let txt = el.textContent.replace(/\s+/g, ' ');
-                        if (txt.toLowerCase().includes("disponible desde")) {
-                            let strong = el.querySelector('strong');
-                            let fecha = strong ? strong.textContent.trim() : "";
-                            if (!fecha) {
-                                let match = txt.match(/disponible desde\s+([a-z0-9\sde]+)/i);
-                                if (match && match[1]) fecha = match[1].trim();
-                            }
-                            if (fecha && !fechasSecuenciales.includes(fecha)) fechasSecuenciales.push(fecha);
-                        }
-                    }
-                });
-            }
+
             let arregloUnidades = [];
             for (let idx = 0; idx < fechasSecuenciales.length; idx++) {
                 arregloUnidades.push({
@@ -268,7 +259,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                 Array.from(filaMaestra.cells).forEach((celda,idx)=>{
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
                     let nomMin=nom.toLowerCase();
-                    // 👇 ACTUALIZADO: Se excluyen explícitamente "nota final", "calificación final" y "calificacion final" 👇
                     if(/foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin) && !/total|promedio|ad:|diagnostica|diagnóstica|repetición|repeticion|nota final|calificaci[oó]n final/i.test(nomMin)){
                         let linkActividad=celda.querySelector('a[href*="mod/"]');
                         let actId = null;
@@ -294,8 +284,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                             if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
                             
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
-                            
-                            // Transformar a nombre corto
                             let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
 
                             let fechasStr = "No especificada";
@@ -330,8 +318,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                             if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
                             
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
-                            
-                            // Transformar a nombre corto
                             let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
 
                             let fechasStr = "No especificada";
@@ -363,7 +349,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                             }
 
                             filasAImprimir.push({
-                                colNom: nombreCorto, // Ahora se muestra el nombre corto tanto en UI como en correos
+                                colNom: nombreCorto,
                                 statusForo: statusForo, faltan: faltan,
                                 totalAlumnos: totalAlumnos, rendimiento: Math.round((totalAlumnos-faltan)/totalAlumnos*100),
                                 fechasStr: fechasStr, textoTermino: textoTermino,
@@ -467,7 +453,7 @@ async function ejecutarExtractor(estudianteObjetivo){
     }
     let cabeceraSuperior = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid ${esBusquedaEstudiante?'#2980b9':'#27ae60'}; padding-bottom:10px;">
-        <h2 style='color:${esBusquedaEstudiante?'#2980b9':'#27ae60'}; margin:0;'>${esBusquedaEstudiante?'👤 Historial: '+estudianteObjetivo:'✅ Auditoría Consolidada'}</h2>
+        <h2 style='color:${esBusquedaEstudiante?'#2980b9':'#27ae60'}; margin:0;'>${esBusquedaEstudiante?'👤 Historial: '+estudianteObjetivo:'✅ Auditoría Consolidada (Blindada)'}</h2>
         <div>
             <button id="btnExportar" style="padding:10px 15px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-right:10px; transition:0.2s;">📥 Exportar Excel</button>
             <button onclick='location.reload()' style='padding:10px 15px; background:#7f8c8d; color:white; border:none; border-radius:6px; cursor:pointer; transition:0.2s;'>⬅️ Volver</button>
@@ -591,6 +577,7 @@ async function ejecutarExtractor(estudianteObjetivo){
     
     renderTabla();
 }
+
 async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
     let urlForoObjetivo=col.urlDirecta&&(col.urlDirecta.includes("mod/forum/view.php")||col.urlDirecta.includes("mod/forum/discuss.php"))?col.urlDirecta:null;
     if(!urlForoObjetivo || !urlForoObjetivo.includes("forum")){
@@ -628,6 +615,7 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
     let linkDebug = `<br><a href="${urlForoObjetivo}" target="_blank" style="font-size:10px;color:#3498db;text-decoration:none;">🔗 Ver foro</a>`;
     try{
         let rForo=await fetch(urlForoObjetivo);
+        if(!rForo.ok) return "<span style='color:#7f8c8d;'>⚠️ Error</span>";
         let rawHtmlForo = await rForo.text();
         let profeEncontrado = false;
         let estudiantes = new Set();
@@ -657,6 +645,7 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
                 if(profeEncontrado) break; 
                 try {
                     let rDeb = await fetch(link);
+                    if(!rDeb.ok) continue;
                     let textDeb = await rDeb.text();
                     if (pId && (textDeb.includes(`id=${pId}`) || textDeb.includes(`userid":${pId}`) || textDeb.includes(`userid":"${pId}"`))) {
                         profeEncontrado = true; break;
