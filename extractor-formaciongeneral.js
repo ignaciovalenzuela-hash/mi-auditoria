@@ -1,9 +1,8 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[52547,53519,53736];
+const ids=[52547,53519,53736,53552,53803];
 const coloresPastel=['#ffffff', '#fcfcfc'];
 
-// Auxiliar para pausas anti-bloqueo del servidor
 const esperar = ms => new Promise(res => setTimeout(res, ms));
 
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
@@ -27,24 +26,19 @@ window.mostrarEstudiantesSinNota = function(datosCodificados) {
     document.body.appendChild(div);
 };
 
-// BLINDAJE DE CORREO: Sistema Dual (Mailto + Copia al Portapapeles)
 window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, explicacionCod, despedidaCod) {
     let asunto = decodeURIComponent(asuntoCod);
     let cuerpoTexto = decodeURIComponent(introCod) + decodeURIComponent(detallesCod) + decodeURIComponent(explicacionCod) + decodeURIComponent(despedidaCod);
     
-    // Si el correo es muy largo para mailto, acortamos la explicación
     if ((asunto + cuerpoTexto).length > 1800) {
         cuerpoTexto = decodeURIComponent(introCod) + decodeURIComponent(detallesCod) + decodeURIComponent(despedidaCod);
     }
 
     let urlMailto = `mailto:${correo}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpoTexto)}`;
+    window.open(urlMailto, '_self');
     
-    // Intentar abrir el cliente de correo
-    let ventana = window.open(urlMailto, '_self');
-    
-    // Ofrecer respaldo inmediato de copiar al portapapeles por si el cliente no abre
     navigator.clipboard.writeText(`Para: ${correo}\nAsunto: ${asunto}\n\n${cuerpoTexto}`).then(() => {
-        console.log("Contenido del correo copiado al portapapeles como respaldo.");
+        console.log("Contenido copiado al portapapeles.");
     }).catch(()=>{});
 };
 
@@ -60,7 +54,7 @@ function generarNombreCorto(nom, unidad) {
 }
 
 function parsearFechaMoodle(texto) {
-    if (!texto || /cierre/i.test(texto)) return null;
+    if (!texto || /cierre del curso/i.test(texto)) return null;
     let t = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
     let meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
     let match = t.match(/(\d+)\s+de\s+([a-z]+)/);
@@ -137,11 +131,10 @@ async function ejecutarExtractor(estudianteObjetivo){
     
     for(let i=0;i<ids.length;i++){
         try{
-            await esperar(150); // Pausa anti-saturación de servidor
+            await esperar(150);
             
-            // BLINDAJE 1: Forzado de parámetros Moodle para ver TODO el libro sin paginación
             let r=await fetch(`https://e-campus.uniacc.cl/grade/report/grader/index.php?id=${ids[i]}&perpage=5000&collapsed=0`);
-            if(!r.ok) continue; // Si la petición falla, omitimos de forma segura
+            if(!r.ok) continue;
             
             let textGrader=await r.text();
             if(textGrader.includes("login/index.php")) {
@@ -200,22 +193,21 @@ async function ejecutarExtractor(estudianteObjetivo){
                 }
             }
 
-            // BLINDAJE 2: Búsqueda extendida de fechas en la portada del curso
+            // BÚSQUEDA Y EXTRACCIÓN DE FECHAS EN PORTADA
             let rCurso = await fetch(`https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}`);
             let dCurso = new DOMParser().parseFromString(rCurso.ok ? await rCurso.text() : "", "text/html");
             
             let fechasSecuenciales = [];
             let mapaActividadUnidad = {}; 
-            
+            let mapaActividadFechas = {}; // Contendrá las fechas explícitas de Apertura y Cierre por evaluación
+
             let secciones = dCurso.querySelectorAll('#accordionEx1 > .card, .course-content li.section, .course-content .section');
-            let contadorUnidadMapeada = 0;
             
             secciones.forEach(sec => {
                 let textoEl = sec.querySelector('.availabilityinfo, .section_availability, [data-region="availabilityinfo"], .isrestricted');
                 let fecha = "";
                 if (textoEl) {
                     let txt = textoEl.textContent.replace(/\s+/g, ' ');
-                    // Captura ampliada de variantes de texto
                     let match = txt.match(/(?:disponible desde|disponible a partir de|abre:|desde)\s+([a-z0-9\sde]+)/i);
                     if (match && match[1]) {
                         fecha = match[1].trim();
@@ -226,13 +218,34 @@ async function ejecutarExtractor(estudianteObjetivo){
                 }
                 if (fecha && !fechasSecuenciales.includes(fecha)) fechasSecuenciales.push(fecha);
                 
-                contadorUnidadMapeada = fechasSecuenciales.length; 
+                let contadorUnidadMapeada = fechasSecuenciales.length; 
                 let unidadAsignadaSec = contadorUnidadMapeada > 0 ? contadorUnidadMapeada : 1;
                 
                 sec.querySelectorAll('a[href*="/mod/"]').forEach(a => {
                     let m = a.href.match(/id=(\d+)/);
                     if (m) mapaActividadUnidad[m[1]] = unidadAsignadaSec;
                 });
+            });
+
+            // ESCÁNER ESPECÍFICO DE ACTIVIDADES (Evaluación Final / Cuestionarios / Tareas con Apertura y Cierre)
+            dCurso.querySelectorAll('.modtype_quiz, .modtype_assign, .activity, li.activity, .course-content li, .card').forEach(actEl => {
+                let link = actEl.querySelector('a[href*="/mod/"]');
+                if (!link) return;
+                let m = link.href.match(/id=(\d+)/);
+                if (!m) return;
+                let actId = m[1];
+
+                let txt = actEl.textContent.replace(/\s+/g, ' ');
+
+                let matchApertura = txt.match(/(?:apertura|abre):\s*([a-z0-9áéíóúñ\s,]+?\d+\s+de\s+[a-z]+(?:\s+de\s+\d{4})?)/i);
+                let matchCierre = txt.match(/(?:cierre|vencimiento|hasta|cierra):\s*([a-z0-9áéíóúñ\s,]+?\d+\s+de\s+[a-z]+(?:\s+de\s+\d{4})?)/i);
+
+                let aperturaVal = matchApertura ? matchApertura[1].trim() : null;
+                let cierreVal = matchCierre ? matchCierre[1].trim() : null;
+
+                if (aperturaVal || cierreVal) {
+                    mapaActividadFechas[actId] = { apertura: aperturaVal, cierre: cierreVal };
+                }
             });
 
             let arregloUnidades = [];
@@ -286,8 +299,14 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
                             let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
 
+                            let fechaAperturaEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].apertura : null;
+                            let fechaCierreEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].cierre : null;
+
                             let fechasStr = "No especificada";
-                            if (arregloUnidades[unidadAsignada - 1]) {
+                            if (fechaCierreEsp) {
+                                let fIni = fechaAperturaEsp || (arregloUnidades[unidadAsignada - 1] ? arregloUnidades[unidadAsignada - 1].inicio : "No especificada");
+                                fechasStr = `<b>Inicio:</b> ${fIni}<br><b>Término:</b> ${fechaCierreEsp}`;
+                            } else if (arregloUnidades[unidadAsignada - 1]) {
                                 let uObj = arregloUnidades[unidadAsignada - 1];
                                 fechasStr = `<b>Inicio:</b> ${uObj.inicio}<br><b>Término:</b> ${uObj.termino}`;
                             }
@@ -320,11 +339,23 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
                             let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
 
+                            let fechaAperturaEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].apertura : null;
+                            let fechaCierreEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].cierre : null;
+
                             let fechasStr = "No especificada";
                             let textoTermino = "Cierre del curso";
                             let fLimite = null;
 
-                            if (arregloUnidades[unidadAsignada - 1]) {
+                            // SI EXISTE FECHA ESPECÍFICA DE CIERRE (EJ. EXAMEN FINAL)
+                            if (fechaCierreEsp) {
+                                let fIni = fechaAperturaEsp || (arregloUnidades[unidadAsignada - 1] ? arregloUnidades[unidadAsignada - 1].inicio : "No especificada");
+                                fechasStr = `<b>Inicio:</b> ${fIni}<br><b>Término:</b> ${fechaCierreEsp}`;
+                                textoTermino = fechaCierreEsp;
+                                let fTerminoObj = parsearFechaMoodle(fechaCierreEsp);
+                                if (fTerminoObj) {
+                                    fLimite = new Date(fTerminoObj.getTime() + (7 * 24 * 60 * 60 * 1000));
+                                }
+                            } else if (arregloUnidades[unidadAsignada - 1]) {
                                 let uObj = arregloUnidades[unidadAsignada - 1];
                                 fechasStr = `<b>Inicio:</b> ${uObj.inicio}<br><b>Término:</b> ${uObj.termino}`;
                                 textoTermino = uObj.termino;
@@ -343,9 +374,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                                     let fTermino = parsearFechaMoodle(textoTermino);
                                     if (fTermino) fLimite = new Date(fTermino.getTime() + (7 * 24 * 60 * 60 * 1000));
                                 }
-                            } else {
-                                let fTermino = parsearFechaMoodle(textoTermino);
-                                if (fTermino) fLimite = new Date(fTermino.getTime() + (7 * 24 * 60 * 60 * 1000));
                             }
 
                             filasAImprimir.push({
