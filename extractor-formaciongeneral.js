@@ -695,4 +695,4 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
     }catch(e){return "<span style='color:#7f8c8d;'>⚠️ Error</span>";}
 }
 iniciarPanelUI();
-})();
+})(); 
