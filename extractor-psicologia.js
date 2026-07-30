@@ -2,7 +2,6 @@
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
 const ids=[51014, 51063, 51098, 51122, 51181, 53631, 51015, 51064, 51099, 51123, 51147, 53632, 51016, 51065, 51100, 51148, 51183, 53633, 51017, 51066, 51101, 51125, 51149, 53634, 51018, 51067, 51150, 51174, 51185, 53635, 51019, 51020, 51021, 51022, 51023, 51024, 51073, 51103, 51151, 51175, 51025, 51074, 51104, 51128, 51152, 51026, 51075, 51105, 51153, 51177, 51027, 51106, 51130, 51154, 51178, 51028, 51077, 51107, 51131, 51155, 51029, 51078, 51030, 51079, 51031, 51080, 51032, 51081, 51033, 51082, 51034, 51083, 51108, 51132, 51035, 51084, 51109, 51133, 51036, 51085, 51110, 51134, 51037, 51086, 51111, 51135, 51038, 51087, 51112, 51136, 51039, 51040, 51041, 51042, 51043, 51044, 51088, 51113, 51137, 51045, 51089, 51114, 51138, 51046, 51090, 51115, 51139, 51047, 51091, 51116, 51164, 51092, 51117, 51141, 51165, 51049, 51050, 51051, 51052, 51053, 51055, 51094, 51119, 51143, 51167, 51056, 51095, 51120, 51144, 51168, 51057, 51096, 51121, 51145];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
-
 const esperar = ms => new Promise(res => setTimeout(res, ms));
 
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
@@ -26,6 +25,217 @@ window.mostrarEstudiantesSinNota = function(datosCodificados) {
     document.body.appendChild(div);
 };
 
+window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
+    let modalPrev = document.getElementById('modal-dashboard');
+    if (modalPrev) modalPrev.remove();
+
+    let totalCursos = datosExtraidos.length;
+    let cursosCompletos = 0;
+    let cursosNotasFaltantes = 0;
+    let cursosForosPendientes = 0;
+    let docentesInactivos = 0;
+
+    let ciclosMap = {};
+    let docentesAtrasadosMap = {};
+
+    datosExtraidos.forEach(curso => {
+        let ciclo = curso.cicloAsignatura || "Sin ciclo";
+        if (!ciclosMap[ciclo]) {
+            ciclosMap[ciclo] = { total: 0, completos: 0, conNotas: 0, conForos: 0 };
+        }
+        ciclosMap[ciclo].total++;
+
+        let tieneNotasFaltantes = false;
+        let tieneForoFaltante = false;
+        let notasFaltantesTotalCurso = 0;
+        let evalPendientesLista = [];
+
+        curso.items.forEach(item => {
+            if (item.faltan > 0) {
+                let pasoPlazo = true;
+                if (item.fLimite && new Date() < item.fLimite) pasoPlazo = false;
+                if (pasoPlazo) {
+                    tieneNotasFaltantes = true;
+                    notasFaltantesTotalCurso += item.faltan;
+                    evalPendientesLista.push(`${item.colNom} (${item.faltan} sin nota)`);
+                }
+            }
+            if (item.statusForo && item.statusForo.includes('❌ No')) {
+                tieneForoFaltante = true;
+            }
+        });
+
+        let accMin = (curso.pAcceso || "").toLowerCase();
+        let esInactivo = false;
+        if (/nunca|mes|año/.test(accMin)) esInactivo = true;
+        else if (/(día|dia)/.test(accMin)) {
+            let nDias = parseInt(accMin.match(/\d+/)?.[0] || 0);
+            if (nDias >= 7) esInactivo = true;
+        }
+
+        if (esInactivo) docentesInactivos++;
+        if (tieneNotasFaltantes) {
+            cursosNotasFaltantes++;
+            ciclosMap[ciclo].conNotas++;
+        }
+        if (tieneForoFaltante) {
+            cursosForosPendientes++;
+            ciclosMap[ciclo].conForos++;
+        }
+
+        let esCompleto = !tieneNotasFaltantes && !tieneForoFaltante && !esInactivo;
+        if (esCompleto) {
+            cursosCompletos++;
+            ciclosMap[ciclo].completos++;
+        }
+
+        if (tieneNotasFaltantes || tieneForoFaltante || esInactivo) {
+            let keyDocente = (curso.pCorreo && curso.pCorreo.includes('@')) ? curso.pCorreo : curso.pNombre;
+            if (!docentesAtrasadosMap[keyDocente]) {
+                docentesAtrasadosMap[keyDocente] = {
+                    nombre: curso.pNombre,
+                    correo: curso.pCorreo,
+                    acceso: curso.pAcceso,
+                    cAcceso: curso.cAcceso,
+                    esInactivo: esInactivo,
+                    cursos: []
+                };
+            }
+            docentesAtrasadosMap[keyDocente].cursos.push({
+                nombreCurso: curso.nombreCurso,
+                ciclo: curso.cicloAsignatura,
+                notasFaltantes: notasFaltantesTotalCurso,
+                evaluaciones: evalPendientesLista,
+                faltaForo: tieneForoFaltante,
+                celdaAcciones: curso.celdaAcciones
+            });
+        }
+    });
+
+    let pctCumplimiento = totalCursos > 0 ? Math.round((cursosCompletos / totalCursos) * 100) : 0;
+
+    let docentesAtrasadosArr = Object.values(docentesAtrasadosMap).map(d => {
+        let totalNotas = d.cursos.reduce((sum, c) => sum + c.notasFaltantes, 0);
+        let totalForos = d.cursos.filter(c => c.faltaForo).length;
+        let score = totalNotas + (totalForos * 5) + (d.esInactivo ? 10 : 0);
+        return { ...d, totalNotas, totalForos, score };
+    }).sort((a, b) => b.score - a.score);
+
+    let htmlCiclos = Object.keys(ciclosMap).map(cicloKey => {
+        let cData = ciclosMap[cicloKey];
+        let pctComp = Math.round((cData.completos / cData.total) * 100);
+        return `
+            <div style="background:#f8f9fa; border:1px solid #e9ecef; border-radius:8px; padding:15px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <strong style="font-size:15px; color:#2c3e50;">📌 ${cicloKey}</strong>
+                    <span style="font-size:13px; font-weight:bold; color:#27ae60;">${pctComp}% Cumplimiento</span>
+                </div>
+                <div style="background:#e0e0e0; border-radius:6px; height:12px; width:100%; overflow:hidden; margin-bottom:8px;">
+                    <div style="background:linear-gradient(90deg, #27ae60, #2ecc71); width:${pctComp}%; height:100%;"></div>
+                </div>
+                <div style="display:flex; gap:15px; font-size:12px; color:#555; flex-wrap:wrap;">
+                    <span>📚 Cursos: <b>${cData.total}</b></span>
+                    <span style="color:#27ae60;">✅ Completos: <b>${cData.completos}</b></span>
+                    <span style="color:#e67e22;">⚠️ Faltan Notas: <b>${cData.conNotas}</b></span>
+                    <span style="color:#c0392b;">💬 Faltan Foros: <b>${cData.conForos}</b></span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    let htmlDocentesAtrasados = docentesAtrasadosArr.length > 0 ? docentesAtrasadosArr.map(doc => {
+        let detallesCursos = doc.cursos.map(c => {
+            let evalsText = c.evaluaciones.length > 0 ? `<br><small style="color:#e67e22;">• ${c.evaluaciones.join(', ')}</small>` : '';
+            let foroText = c.faltaForo ? `<br><small style="color:#c0392b;">• Falta moderar foro</small>` : '';
+            return `<b>${c.nombreCurso}</b> (${c.ciclo})${evalsText}${foroText}`;
+        }).join('<hr style="border:0; border-top:1px dashed #eee; margin:5px 0;">');
+
+        return `
+            <tr>
+                <td style="padding:10px; border:1px solid #ddd; font-weight:bold;">${doc.nombre}<br><small style="color:#7f8c8d; font-weight:normal;">${doc.correo}</small></td>
+                <td style="padding:10px; border:1px solid #ddd; color:${doc.cAcceso}; font-weight:bold; text-align:center;">${doc.acceso}</td>
+                <td style="padding:10px; border:1px solid #ddd; font-size:11px;">${detallesCursos}</td>
+                <td style="padding:10px; border:1px solid #ddd; text-align:center; font-weight:bold; color:#c0392b;">${doc.totalNotas}</td>
+                <td style="padding:10px; border:1px solid #ddd; text-align:center;">${doc.cursos[0]?.celdaAcciones || '-'}</td>
+            </tr>
+        `;
+    }).join('') : `<tr><td colspan="5" style="text-align:center; padding:20px; color:#27ae60; font-weight:bold;">🎉 ¡Excelente! No se registran docentes con atrasos.</td></tr>`;
+
+    let modalDiv = document.createElement('div');
+    modalDiv.id = "modal-dashboard";
+    modalDiv.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:100000; display:flex; justify-content:center; align-items:center; font-family:sans-serif;";
+    
+    modalDiv.innerHTML = `
+        <div style="background:white; border-radius:12px; width:92%; max-width:1150px; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 15px 35px rgba(0,0,0,0.3); overflow:hidden;">
+            <div style="background:linear-gradient(135deg, #2c3e50, #34495e); color:white; padding:18px 25px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h2 style="margin:0; font-size:20px; font-weight:bold;">📊 Dashboard de Auditoría y Estadísticas</h2>
+                    <p style="margin:4px 0 0 0; font-size:12px; opacity:0.8;">Métricas e indicadores consolidados del estado de revisión de asignaturas</p>
+                </div>
+                <button onclick="document.getElementById('modal-dashboard').remove()" style="background:#e74c3c; color:white; border:none; padding:8px 15px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">❌ Cerrar</button>
+            </div>
+
+            <div style="overflow-y:auto; padding:25px; background:#f4f6f9; flex-grow:1;">
+                
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:15px; margin-bottom:25px;">
+                    <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #2980b9; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">Total Cursos</span>
+                        <div style="font-size:26px; font-weight:bold; color:#2c3e50; margin-top:5px;">${totalCursos}</div>
+                    </div>
+                    <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #27ae60; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">Cursos Completos</span>
+                        <div style="font-size:26px; font-weight:bold; color:#27ae60; margin-top:5px;">${cursosCompletos}</div>
+                    </div>
+                    <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #e67e22; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">Faltan Notas</span>
+                        <div style="font-size:26px; font-weight:bold; color:#e67e22; margin-top:5px;">${cursosNotasFaltantes}</div>
+                    </div>
+                    <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #c0392b; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">Faltan Foros</span>
+                        <div style="font-size:26px; font-weight:bold; color:#c0392b; margin-top:5px;">${cursosForosPendientes}</div>
+                    </div>
+                    <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #8e44ad; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">Sin Acceso >=7d</span>
+                        <div style="font-size:26px; font-weight:bold; color:#8e44ad; margin-top:5px;">${docentesInactivos}</div>
+                    </div>
+                    <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #16a085; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">% Cumplimiento</span>
+                        <div style="font-size:26px; font-weight:bold; color:#16a085; margin-top:5px;">${pctCumplimiento}%</div>
+                    </div>
+                </div>
+
+                <div style="background:white; border-radius:10px; padding:20px; margin-bottom:25px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                    <h3 style="margin:0 0 15px 0; color:#2c3e50; font-size:16px; border-bottom:2px solid #ecf0f1; padding-bottom:8px;">📈 Estadísticas y Avance por Ciclo</h3>
+                    ${htmlCiclos}
+                </div>
+
+                <div style="background:white; border-radius:10px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                    <h3 style="margin:0 0 15px 0; color:#2c3e50; font-size:16px; border-bottom:2px solid #ecf0f1; padding-bottom:8px;">🚨 Docentes con Mayor Registro de Atrasos / Inactividad</h3>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                            <thead>
+                                <tr style="background:#2c3e50; color:white;">
+                                    <th style="padding:10px; text-align:left;">Docente</th>
+                                    <th style="padding:10px; text-align:center;">Último Acceso</th>
+                                    <th style="padding:10px; text-align:left;">Asignaturas / Pendientes</th>
+                                    <th style="padding:10px; text-align:center;">Notas Faltantes</th>
+                                    <th style="padding:10px; text-align:center;">Acciones Directas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${htmlDocentesAtrasados}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modalDiv);
+};
+
 window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, explicacionCod, despedidaCod) {
     let asunto = decodeURIComponent(asuntoCod);
     let cuerpoTexto = decodeURIComponent(introCod) + decodeURIComponent(detallesCod) + decodeURIComponent(explicacionCod) + decodeURIComponent(despedidaCod);
@@ -33,7 +243,6 @@ window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, e
     if ((asunto + cuerpoTexto).length > 1800) {
         cuerpoTexto = decodeURIComponent(introCod) + decodeURIComponent(detallesCod) + decodeURIComponent(despedidaCod);
     }
-
     let urlMailto = `mailto:${correo}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpoTexto)}`;
     window.open(urlMailto, '_self');
     
@@ -66,6 +275,43 @@ function parsearFechaMoodle(texto) {
     let matchAnio = t.match(/\b(\d{4})\b/);
     let anio = matchAnio ? parseInt(matchAnio[1]) : new Date().getFullYear();
     return new Date(anio, mesIdx, dia);
+}
+
+function determinarCicloAsignatura(nombreCurso, arregloUnidades) {
+    let nom = normalizarTexto(nombreCurso);
+    if (nom.includes("semestral") || nom.includes("semestre")) return "Semestral";
+    
+    if (arregloUnidades.length > 0 && arregloUnidades[0].inicio) {
+        let fInicioPrimera = parsearFechaMoodle(arregloUnidades[0].inicio);
+        let fFinUltima = null;
+        let ultimaU = arregloUnidades[arregloUnidades.length - 1];
+        if (ultimaU && ultimaU.termino) {
+            fFinUltima = parsearFechaMoodle(ultimaU.termino);
+        }
+        
+        if (fInicioPrimera) {
+            let mesInicio = fInicioPrimera.getMonth(); 
+            
+            if (fFinUltima) {
+                let diffDias = Math.round((fFinUltima.getTime() - fInicioPrimera.getTime()) / (1000 * 60 * 60 * 24));
+                if (diffDias >= 100) return "Semestral";
+            }
+            
+            if (mesInicio === 2 || mesInicio === 3) { // Marzo / Abril
+                if (fFinUltima && fFinUltima.getMonth() >= 6) return "Semestral";
+                return "1er Ciclo";
+            } else if (mesInicio === 4 || mesInicio === 5) { // Mayo / Junio
+                if (fFinUltima && fFinUltima.getMonth() >= 8) return "Semestral";
+                return "2do Ciclo";
+            } else if (mesInicio === 7 || mesInicio === 8) { // Agosto / Septiembre
+                if (fFinUltima && (fFinUltima.getMonth() >= 11 || fFinUltima.getMonth() <= 1)) return "Semestral";
+                return "1er Ciclo (S2)";
+            } else if (mesInicio === 9 || mesInicio === 10) {
+                return "2do Ciclo (S2)";
+            }
+        }
+    }
+    return "-";
 }
 
 function obtenerNumeroUnidad(nombreColumna) {
@@ -142,7 +388,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                 location.reload();
                 return;
             }
-
             if(esBusquedaEstudiante&&!textGrader.toLowerCase().includes(estudianteObjetivo)){
                 document.getElementById('p').style.width=((i+1)/ids.length*100)+"%";
                 document.getElementById('pct').textContent=`${i+1}/${ids.length} Aulas`;
@@ -193,17 +438,19 @@ async function ejecutarExtractor(estudianteObjetivo){
                 }
             }
 
-            // BÚSQUEDA Y EXTRACCIÓN DE FECHAS EN PORTADA
             let rCurso = await fetch(`https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}`);
             let dCurso = new DOMParser().parseFromString(rCurso.ok ? await rCurso.text() : "", "text/html");
             
             let fechasSecuenciales = [];
             let mapaActividadUnidad = {}; 
-            let mapaActividadFechas = {}; // Contendrá las fechas explícitas de Apertura y Cierre por evaluación
-
+            let mapaActividadFechas = {};
             let secciones = dCurso.querySelectorAll('#accordionEx1 > .card, .course-content li.section, .course-content .section');
             
             secciones.forEach(sec => {
+                let headerEl = sec.querySelector('.card-header, .sectionname, h3, h4, h5');
+                let headerTxt = headerEl ? normalizarTexto(headerEl.textContent) : '';
+                let esSeccionUnidad = /unidad|\bu\d+\b|modulo|módulo/i.test(headerTxt);
+
                 let textoEl = sec.querySelector('.availabilityinfo, .section_availability, [data-region="availabilityinfo"], .isrestricted');
                 let fecha = "";
                 if (textoEl) {
@@ -219,7 +466,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                 if (fecha && !fechasSecuenciales.includes(fecha)) fechasSecuenciales.push(fecha);
                 
                 let contadorUnidadMapeada = fechasSecuenciales.length; 
-                let unidadAsignadaSec = contadorUnidadMapeada > 0 ? contadorUnidadMapeada : 1;
+                let unidadAsignadaSec = (contadorUnidadMapeada > 0 || esSeccionUnidad) ? (contadorUnidadMapeada || 1) : null;
                 
                 sec.querySelectorAll('a[href*="/mod/"]').forEach(a => {
                     let m = a.href.match(/id=(\d+)/);
@@ -227,22 +474,17 @@ async function ejecutarExtractor(estudianteObjetivo){
                 });
             });
 
-            // ESCÁNER ESPECÍFICO DE ACTIVIDADES (Evaluación Final / Cuestionarios / Tareas con Apertura y Cierre)
             dCurso.querySelectorAll('.modtype_quiz, .modtype_assign, .activity, li.activity, .course-content li, .card').forEach(actEl => {
                 let link = actEl.querySelector('a[href*="/mod/"]');
                 if (!link) return;
                 let m = link.href.match(/id=(\d+)/);
                 if (!m) return;
                 let actId = m[1];
-
                 let txt = actEl.textContent.replace(/\s+/g, ' ');
-
                 let matchApertura = txt.match(/(?:apertura|abre):\s*([a-z0-9áéíóúñ\s,]+?\d+\s+de\s+[a-z]+(?:\s+de\s+\d{4})?)/i);
                 let matchCierre = txt.match(/(?:cierre|vencimiento|hasta|cierra):\s*([a-z0-9áéíóúñ\s,]+?\d+\s+de\s+[a-z]+(?:\s+de\s+\d{4})?)/i);
-
                 let aperturaVal = matchApertura ? matchApertura[1].trim() : null;
                 let cierreVal = matchCierre ? matchCierre[1].trim() : null;
-
                 if (aperturaVal || cierreVal) {
                     mapaActividadFechas[actId] = { apertura: aperturaVal, cierre: cierreVal };
                 }
@@ -257,14 +499,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                 });
             }
             
-            let cicloAsignatura = "-";
-            if (arregloUnidades.length > 0 && arregloUnidades[0].inicio) {
-                let fInicioPrimera = parsearFechaMoodle(arregloUnidades[0].inicio);
-                if (fInicioPrimera) {
-                    if (fInicioPrimera.getMonth() === 2) cicloAsignatura = "1er Ciclo";
-                    else if (fInicioPrimera.getMonth() === 4) cicloAsignatura = "2do Ciclo";
-                }
-            }
+            let cicloAsignatura = determinarCicloAsignatura(nombreCurso, arregloUnidades);
 
             let filaMaestra=Array.from(d.querySelectorAll('table tr')).find(f=>(f.textContent||"").includes("Nombre / Apellido")||(f.textContent||"").includes("Dirección de correo"));
             if(filaMaestra){
@@ -272,13 +507,34 @@ async function ejecutarExtractor(estudianteObjetivo){
                 Array.from(filaMaestra.cells).forEach((celda,idx)=>{
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
                     let nomMin=nom.toLowerCase();
-                    if(/foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin) && !/total|promedio|ad:|diagnostica|diagnóstica|repetición|repeticion|nota final|calificaci[oó]n final/i.test(nomMin)){
+
+                    let esExcluido = /total|promedio|ad:|diagnost|entrada|caracterizac|encuesta|asistencia|repetici|nota final|calificaci[oó]n final/i.test(nomMin);
+                    let esEvaluacion = /foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin);
+
+                    if(esEvaluacion && !esExcluido){
                         let linkActividad=celda.querySelector('a[href*="mod/"]');
                         let actId = null;
                         if (linkActividad) {
                             let matchId = linkActividad.href.match(/id=(\d+)/);
                             if (matchId) actId = matchId[1];
                         }
+
+                        let esForo = /foro/i.test(nomMin);
+                        if (esForo) {
+                            if (/presentac|bienvenid|consult|duda|aviso|novedad|cafeter|social|orientac|tecnic/i.test(nomMin)) {
+                                return; 
+                            }
+                            let numUnidadNombre = obtenerNumeroUnidad(nom);
+                            let unidadMapa = actId ? mapaActividadUnidad[actId] : null;
+                            let tieneUnidadNombre = /unidad|\bu\d+\b|sumativ|formativ/i.test(nomMin);
+                            
+                            let estaAsociadoAUnidad = (numUnidadNombre !== null && numUnidadNombre > 0) || (unidadMapa !== null && unidadMapa > 0) || tieneUnidadNombre;
+                            
+                            if (!estaAsociadoAUnidad) {
+                                return; 
+                            }
+                        }
+
                         colValidas.push({idx:idx,nom:nom,urlDirecta:linkActividad?linkActividad.href:null, actId: actId});
                     }
                 });
@@ -298,10 +554,8 @@ async function ejecutarExtractor(estudianteObjetivo){
                             
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
                             let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
-
                             let fechaAperturaEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].apertura : null;
                             let fechaCierreEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].cierre : null;
-
                             let fechasStr = "No especificada";
                             if (fechaCierreEsp) {
                                 let fIni = fechaAperturaEsp || (arregloUnidades[unidadAsignada - 1] ? arregloUnidades[unidadAsignada - 1].inicio : "No especificada");
@@ -338,15 +592,12 @@ async function ejecutarExtractor(estudianteObjetivo){
                             
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
                             let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
-
                             let fechaAperturaEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].apertura : null;
                             let fechaCierreEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].cierre : null;
-
                             let fechasStr = "No especificada";
                             let textoTermino = "Cierre del curso";
                             let fLimite = null;
 
-                            // SI EXISTE FECHA ESPECÍFICA DE CIERRE (EJ. EXAMEN FINAL)
                             if (fechaCierreEsp) {
                                 let fIni = fechaAperturaEsp || (arregloUnidades[unidadAsignada - 1] ? arregloUnidades[unidadAsignada - 1].inicio : "No especificada");
                                 fechasStr = `<b>Inicio:</b> ${fIni}<br><b>Término:</b> ${fechaCierreEsp}`;
@@ -359,7 +610,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                                 let uObj = arregloUnidades[unidadAsignada - 1];
                                 fechasStr = `<b>Inicio:</b> ${uObj.inicio}<br><b>Término:</b> ${uObj.termino}`;
                                 textoTermino = uObj.termino;
-
                                 let totalUn = arregloUnidades.length;
                                 let esUnidadFinal = (unidadAsignada === totalUn);
                                 let esExamenFinal = /final|proyecto|integraci|examen/i.test(col.nom);
@@ -375,7 +625,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                                     if (fTermino) fLimite = new Date(fTermino.getTime() + (7 * 24 * 60 * 60 * 1000));
                                 }
                             }
-
                             filasAImprimir.push({
                                 colNom: nombreCorto,
                                 statusForo: statusForo, faltan: faltan,
@@ -410,7 +659,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                         let resumenNotasFaltantes = ""; 
                         let resumenNotasTodoPendiente = ""; 
                         let tieneNotasParaTodoPendiente = false;
-
                         filasAImprimir.forEach(item => {
                             if(item.faltan > 0) {
                                 let pasoPlazo = true;
@@ -426,7 +674,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                                 }
                             }
                         });
-
                         let arrayBotones = [];
                         let listaPendientesMaestra = [];
                         if(sinAcceso7Dias) listaPendientesMaestra.push("- Regularizar su acceso a la plataforma (registra alerta de inactividad).");
@@ -479,10 +726,12 @@ async function ejecutarExtractor(estudianteObjetivo){
         document.body.innerHTML=`<div style='padding:40px;text-align:center;'><h2 style='color:#c0392b;'>⚠️ No se encontraron resultados</h2><button onclick='location.reload()' style='padding:12px 25px;background:#2980b9;color:white;border:none;border-radius:6px;cursor:pointer;'>Volver</button></div>`;
         return;
     }
+
     let cabeceraSuperior = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid ${esBusquedaEstudiante?'#2980b9':'#27ae60'}; padding-bottom:10px;">
         <h2 style='color:${esBusquedaEstudiante?'#2980b9':'#27ae60'}; margin:0;'>${esBusquedaEstudiante?'👤 Historial: '+estudianteObjetivo:'✅ Auditoría Consolidada (Blindada)'}</h2>
         <div>
+            <button id="btnDashboard" style="padding:10px 15px; background:#8e44ad; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-right:10px; transition:0.2s;">📊 Dashboard</button>
             <button id="btnExportar" style="padding:10px 15px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-right:10px; transition:0.2s;">📥 Exportar Excel</button>
             <button onclick='location.reload()' style='padding:10px 15px; background:#7f8c8d; color:white; border:none; border-radius:6px; cursor:pointer; transition:0.2s;'>⬅️ Volver</button>
         </div>
@@ -502,11 +751,17 @@ async function ejecutarExtractor(estudianteObjetivo){
             }).join('')}
         </tr>
     </thead>`;
+
     document.body.innerHTML=`<div style='padding:20px; font-family:sans-serif;'>${cabeceraSuperior}<div style='overflow-x:auto; max-height:85vh; border:1px solid #bdc3c7; box-shadow:0 5px 15px rgba(0,0,0,0.05);'><table id='tablaAuditoria' style='border-collapse:collapse;width:100%;font-size:12px;'>${theadCompleto}<tbody></tbody></table></div></div>`;
     
     document.querySelectorAll('.filtro-col').forEach(input => {
         input.addEventListener('input', renderTabla);
     });
+
+    const btnDash = document.getElementById('btnDashboard');
+    if (btnDash) {
+        btnDash.onclick = () => window.mostrarDashboardModal(datosExtraidos, esBusquedaEstudiante);
+    }
     
     const btnExp = document.getElementById('btnExportar');
     if (btnExp) {
@@ -694,5 +949,6 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
         
     }catch(e){return "<span style='color:#7f8c8d;'>⚠️ Error</span>";}
 }
+
 iniciarPanelUI();
-})(); 
+})();
