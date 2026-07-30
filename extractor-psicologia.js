@@ -39,7 +39,7 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
     let docentesAtrasadosMap = {};
 
     datosExtraidos.forEach(curso => {
-        let ciclo = curso.cicloAsignatura || "Sin ciclo";
+        let ciclo = curso.cicloAsignatura || "Semestral";
         if (!ciclosMap[ciclo]) {
             ciclosMap[ciclo] = { total: 0, completos: 0, conNotas: 0, conForos: 0 };
         }
@@ -279,10 +279,10 @@ function parsearFechaMoodle(texto) {
 
 function determinarCicloAsignatura(nombreCurso, arregloUnidades) {
     let nom = normalizarTexto(nombreCurso);
-    if (nom.includes("semestral") || nom.includes("semestre")) return "Semestral";
+    if (nom.includes("semestral") || nom.includes("semestre") || nom.includes("taller") || nom.includes("practica")) return "Semestral";
     
-    if (arregloUnidades.length > 0 && arregloUnidades[0].inicio) {
-        let fInicioPrimera = parsearFechaMoodle(arregloUnidades[0].inicio);
+    if (arregloUnidades.length > 0) {
+        let fInicioPrimera = arregloUnidades[0].inicio ? parsearFechaMoodle(arregloUnidades[0].inicio) : null;
         let fFinUltima = null;
         let ultimaU = arregloUnidades[arregloUnidades.length - 1];
         if (ultimaU && ultimaU.termino) {
@@ -294,24 +294,23 @@ function determinarCicloAsignatura(nombreCurso, arregloUnidades) {
             
             if (fFinUltima) {
                 let diffDias = Math.round((fFinUltima.getTime() - fInicioPrimera.getTime()) / (1000 * 60 * 60 * 24));
-                if (diffDias >= 100) return "Semestral";
+                // Si la asignatura dura 90 días o más (marzo a julio/agosto), es explícitamente Semestral
+                if (diffDias >= 90) return "Semestral";
+
+                let mesFin = fFinUltima.getMonth();
+                // Marzo/Abril a Julio/Agosto
+                if ((mesInicio === 2 || mesInicio === 3) && mesFin >= 6) return "Semestral";
+                // Agosto/Septiembre a Diciembre/Enero
+                if ((mesInicio === 7 || mesInicio === 8) && (mesFin >= 11 || mesFin <= 1)) return "Semestral";
             }
             
-            if (mesInicio === 2 || mesInicio === 3) { // Marzo / Abril
-                if (fFinUltima && fFinUltima.getMonth() >= 6) return "Semestral";
-                return "1er Ciclo";
-            } else if (mesInicio === 4 || mesInicio === 5) { // Mayo / Junio
-                if (fFinUltima && fFinUltima.getMonth() >= 8) return "Semestral";
-                return "2do Ciclo";
-            } else if (mesInicio === 7 || mesInicio === 8) { // Agosto / Septiembre
-                if (fFinUltima && (fFinUltima.getMonth() >= 11 || fFinUltima.getMonth() <= 1)) return "Semestral";
-                return "1er Ciclo (S2)";
-            } else if (mesInicio === 9 || mesInicio === 10) {
-                return "2do Ciclo (S2)";
-            }
+            if (mesInicio === 2 || mesInicio === 3) return "1er Ciclo";
+            if (mesInicio === 4 || mesInicio === 5) return "2do Ciclo";
+            if (mesInicio === 7 || mesInicio === 8) return "1er Ciclo (S2)";
+            if (mesInicio === 9 || mesInicio === 10) return "2do Ciclo (S2)";
         }
     }
-    return "-";
+    return "Semestral";
 }
 
 function obtenerNumeroUnidad(nombreColumna) {
@@ -508,6 +507,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
                     let nomMin=nom.toLowerCase();
 
+                    // EXCLUSIÓN GENERAL DE EVALUACIONES NO CALIFICABLES / DIAGNÓSTICAS
                     let esExcluido = /total|promedio|ad:|diagnost|entrada|caracterizac|encuesta|asistencia|repetici|nota final|calificaci[oó]n final/i.test(nomMin);
                     let esEvaluacion = /foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin);
 
@@ -521,17 +521,21 @@ async function ejecutarExtractor(estudianteObjetivo){
 
                         let esForo = /foro/i.test(nomMin);
                         if (esForo) {
-                            if (/presentac|bienvenid|consult|duda|aviso|novedad|cafeter|social|orientac|tecnic/i.test(nomMin)) {
+                            // FILTRO EXPLICITO DE FOROS: Descartar diagnósticos, avisos, consultas y foros informativos
+                            if (/diagnost|entrada|presentac|bienvenid|consult|duda|aviso|novedad|cafeter|social|orientac|tecnic/i.test(nomMin)) {
                                 return; 
                             }
+
+                            // INCLUSIÓN ESTRICTA: Debe ser foro "Sala de clase" o pertenecer explícitamente a una Unidad / Evaluación
+                            let esSalaDeClase = /sala de clase/i.test(nomMin);
                             let numUnidadNombre = obtenerNumeroUnidad(nom);
                             let unidadMapa = actId ? mapaActividadUnidad[actId] : null;
-                            let tieneUnidadNombre = /unidad|\bu\d+\b|sumativ|formativ/i.test(nomMin);
+                            let tieneUnidadNombre = /unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(nomMin);
                             
-                            let estaAsociadoAUnidad = (numUnidadNombre !== null && numUnidadNombre > 0) || (unidadMapa !== null && unidadMapa > 0) || tieneUnidadNombre;
+                            let esForoValido = esSalaDeClase || (numUnidadNombre !== null && numUnidadNombre > 0) || (unidadMapa !== null && unidadMapa > 0) || tieneUnidadNombre;
                             
-                            if (!estaAsociadoAUnidad) {
-                                return; 
+                            if (!esForoValido) {
+                                return; // Descartar cualquier otro foro fuera de Unidad / Sala de Clase
                             }
                         }
 
@@ -879,7 +883,10 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
                     let enlacesForo = seccion.querySelectorAll('a[href*="/mod/forum/view.php"], a[href*="/mod/forum/discuss.php"]');
                     enlacesForo.forEach(enlace => {
                         let tituloForo = normalizarTexto(enlace.textContent);
-                        if (!tituloForo.includes("ad a traves") && !tituloForo.includes("ad ") && !tituloForo.includes("diagnostica") && !tituloForo.includes("duda") && !tituloForo.includes("aviso") && !tituloForo.includes("presenta")) {
+                        let esForoInvalido = /diagnost|entrada|duda|aviso|presenta|cafeter|tecnic|consult/i.test(tituloForo);
+                        let esForoValido = /sala de clase|unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(tituloForo);
+
+                        if (!esForoInvalido && esForoValido) {
                             forosCandidatos.push({
                                 href: enlace.href,
                                 esSalaDeClases: tituloForo.includes("sala de clase") || tituloForo.includes("evaluado")
