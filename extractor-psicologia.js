@@ -1,9 +1,8 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[51014, 51063, 51098, 51122, 51181, 53631, 51015, 51064, 51099, 51123, 51147, 53632, 51016, 51065, 51100, 51148, 51183, 53633, 51017];
+const ids=[51014, 51063, 51098, 51122, 51181, 53631, 51015, 51064, 51099, 51123, 51147, 53632, 51016, 51065, 51100, 51148, 51183, 53633, 51017, 51066, 51101, 51125, 51149, 53634, 51018, 51067, 51150, 51174, 51185, 53635, 51019, 51020, 51021, 51022, 51023, 51024, 51073, 51103, 51151, 51175, 51025, 51074, 51104, 51128, 51152, 51026, 51075, 51105, 51153, 51177, 51027, 51106, 51130, 51154, 51178, 51028, 51077, 51107, 51131, 51155, 51029, 51078, 51030, 51079, 51031, 51080, 51032, 51081, 51033, 51082, 51034, 51083, 51108, 51132, 51035, 51084, 51109, 51133, 51036, 51085, 51110, 51134, 51037, 51086, 51111, 51135, 51038, 51087, 51112, 51136, 51039, 51040, 51041, 51042, 51043, 51044, 51088, 51113, 51137, 51045, 51089, 51114, 51138, 51046, 51090, 51115, 51139, 51047, 51091, 51116, 51164, 51092, 51117, 51141, 51165, 51049, 51050, 51051, 51052, 51053, 51055, 51094, 51119, 51143, 51167, 51056, 51095, 51120, 51144, 51168, 51057, 51096, 51121, 51145];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
 const esperar = ms => new Promise(res => setTimeout(res, ms));
-
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
     let estudiantes = decodeURIComponent(datosCodificados).split('||');
     let listaHtml = estudiantes.map(e => `<li style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">👤 ${e}</li>`).join('');
@@ -24,11 +23,9 @@ window.mostrarEstudiantesSinNota = function(datosCodificados) {
     `;
     document.body.appendChild(div);
 };
-
 window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
     let modalPrev = document.getElementById('modal-dashboard');
     if (modalPrev) modalPrev.remove();
-
     let totalCursos = datosExtraidos.length;
     let cursosCompletos = 0;
     let cursosNotasFaltantes = 0;
@@ -39,7 +36,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
     let evaluacionesCalificadas = 0;
     let totalForosEvaluados = 0;
     let forosAtendidos = 0;
-
     let ciclosMap = {
         "1er Ciclo": { total: 0, completos: 0, conNotas: 0, conForos: 0 },
         "2do Ciclo": { total: 0, completos: 0, conNotas: 0, conForos: 0 },
@@ -47,28 +43,23 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
     };
     
     let docentesAtrasadosMap = {};
-
     datosExtraidos.forEach(curso => {
         let ciclo = curso.cicloAsignatura || "Semestral";
         if (!ciclosMap[ciclo]) {
             ciclosMap[ciclo] = { total: 0, completos: 0, conNotas: 0, conForos: 0 };
         }
         ciclosMap[ciclo].total++;
-
         let tieneNotasFaltantes = false;
         let tieneForoFaltante = false;
         let notasFaltantesTotalCurso = 0;
         let evalPendientesLista = [];
-
         curso.items.forEach(item => {
             totalEvaluaciones++;
             if (item.faltan === 0) evaluacionesCalificadas++;
-
             if (item.statusForo !== "No aplica") {
                 totalForosEvaluados++;
                 if (item.statusForo.includes('✅')) forosAtendidos++;
             }
-
             if (item.faltan > 0) {
                 let pasoPlazo = true;
                 if (item.fLimite && new Date() < item.fLimite) pasoPlazo = false;
@@ -82,7 +73,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
                 tieneForoFaltante = true;
             }
         });
-
         let accMin = (curso.pAcceso || "").toLowerCase();
         let esInactivo = false;
         if (/nunca|mes|año/.test(accMin)) esInactivo = true;
@@ -90,7 +80,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
             let nDias = parseInt(accMin.match(/\d+/)?.[0] || 0);
             if (nDias >= 7) esInactivo = true;
         }
-
         if (esInactivo) docentesInactivos++;
         if (tieneNotasFaltantes) {
             cursosNotasFaltantes++;
@@ -100,13 +89,11 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
             cursosForosPendientes++;
             ciclosMap[ciclo].conForos++;
         }
-
         let esCompleto = !tieneNotasFaltantes && !tieneForoFaltante && !esInactivo;
         if (esCompleto) {
             cursosCompletos++;
             ciclosMap[ciclo].completos++;
         }
-
         if (tieneNotasFaltantes || tieneForoFaltante || esInactivo) {
             let keyDocente = (curso.pCorreo && curso.pCorreo.includes('@')) ? curso.pCorreo : curso.pNombre;
             if (!docentesAtrasadosMap[keyDocente]) {
@@ -129,18 +116,15 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
             });
         }
     });
-
     let pctCumplimiento = totalCursos > 0 ? Math.round((cursosCompletos / totalCursos) * 100) : 0;
     let pctNotasAlDia = totalEvaluaciones > 0 ? Math.round((evaluacionesCalificadas / totalEvaluaciones) * 100) : 100;
     let pctForosAlDia = totalForosEvaluados > 0 ? Math.round((forosAtendidos / totalForosEvaluados) * 100) : 100;
-
     let docentesAtrasadosArr = Object.values(docentesAtrasadosMap).map(d => {
         let totalNotas = d.cursos.reduce((sum, c) => sum + c.notasFaltantes, 0);
         let totalForos = d.cursos.filter(c => c.faltaForo).length;
         let score = totalNotas + (totalForos * 5) + (d.esInactivo ? 10 : 0);
         return { ...d, totalNotas, totalForos, score };
     }).sort((a, b) => b.score - a.score);
-
     let htmlCiclos = Object.keys(ciclosMap).map(cicloKey => {
         let cData = ciclosMap[cicloKey];
         if (cData.total === 0) return ''; 
@@ -163,14 +147,12 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
             </div>
         `;
     }).join('');
-
     let htmlDocentesAtrasados = docentesAtrasadosArr.length > 0 ? docentesAtrasadosArr.map(doc => {
         let detallesCursos = doc.cursos.map(c => {
             let evalsText = c.evaluaciones.length > 0 ? `<br><small style="color:#e67e22;">• ${c.evaluaciones.join(', ')}</small>` : '';
             let foroText = c.faltaForo ? `<br><small style="color:#c0392b;">• Falta moderar foro</small>` : '';
             return `<b>${c.nombreCurso}</b> <span style="font-size:10px; color:#7f8c8d;">(${c.ciclo})</span>${evalsText}${foroText}`;
         }).join('<hr style="border:0; border-top:1px dashed #eee; margin:5px 0;">');
-
         return `
             <tr>
                 <td style="padding:10px; border:1px solid #ddd; font-weight:bold;">${doc.nombre}<br><small style="color:#7f8c8d; font-weight:normal;">${doc.correo}</small></td>
@@ -181,7 +163,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
             </tr>
         `;
     }).join('') : `<tr><td colspan="5" style="text-align:center; padding:20px; color:#27ae60; font-weight:bold;">🎉 ¡Sin alertas! Todos los docentes están al día.</td></tr>`;
-
     let modalDiv = document.createElement('div');
     modalDiv.id = "modal-dashboard";
     modalDiv.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:100000; display:flex; justify-content:center; align-items:center; font-family:sans-serif;";
@@ -196,7 +177,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
                 </div>
                 <button onclick="document.getElementById('modal-dashboard').remove()" style="background:#e74c3c; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">❌ Cerrar</button>
             </div>
-
             <div style="overflow-y:auto; padding:25px; background:#f4f6f9; flex-grow:1;">
                 
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:15px; margin-bottom:25px;">
@@ -225,7 +205,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
                         <div style="font-size:26px; font-weight:bold; color:#16a085; margin-top:5px;">${pctCumplimiento}%</div>
                     </div>
                 </div>
-
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:25px;">
                     <div style="background:white; padding:18px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
                         <h4 style="margin:0 0 10px 0; color:#2c3e50; font-size:14px;">📝 Cobertura Global de Calificaciones</h4>
@@ -235,7 +214,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
                         </div>
                         <p style="font-size:11px; color:#7f8c8d; margin:8px 0 0 0;">${evaluacionesCalificadas} de ${totalEvaluaciones} evaluaciones totales se encuentran 100% calificadas.</p>
                     </div>
-
                     <div style="background:white; padding:18px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
                         <h4 style="margin:0 0 10px 0; color:#2c3e50; font-size:14px;">💬 Cobertura de Moderación en Foros</h4>
                         <div style="font-size:22px; font-weight:bold; color:#8e44ad; margin-bottom:8px;">${pctForosAlDia}% de Foros Atendidos</div>
@@ -245,12 +223,10 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
                         <p style="font-size:11px; color:#7f8c8d; margin:8px 0 0 0;">${forosAtendidos} de ${totalForosEvaluados} foros de discusión / sala de clase registran respuestas del docente.</p>
                     </div>
                 </div>
-
                 <div style="background:white; border-radius:10px; padding:20px; margin-bottom:25px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
                     <h3 style="margin:0 0 15px 0; color:#2c3e50; font-size:16px; border-bottom:2px solid #ecf0f1; padding-bottom:8px;">📈 Desglose y Avance por Ciclo Académico</h3>
                     ${htmlCiclos}
                 </div>
-
                 <div style="background:white; border-radius:10px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
                     <h3 style="margin:0 0 15px 0; color:#2c3e50; font-size:16px; border-bottom:2px solid #ecf0f1; padding-bottom:8px;">🚨 Matriz Prioritaria de Intervención Docente</h3>
                     <div style="overflow-x:auto;">
@@ -270,14 +246,11 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
                         </table>
                     </div>
                 </div>
-
             </div>
         </div>
     `;
-
     document.body.appendChild(modalDiv);
 };
-
 window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, explicacionCod, despedidaCod) {
     let asunto = decodeURIComponent(asuntoCod);
     let cuerpoTexto = decodeURIComponent(introCod) + decodeURIComponent(detallesCod) + decodeURIComponent(explicacionCod) + decodeURIComponent(despedidaCod);
@@ -292,18 +265,15 @@ window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, e
         console.log("Contenido copiado al portapapeles.");
     }).catch(()=>{});
 };
-
 function normalizarTexto(t){
     return t?t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim():"";
 }
-
 function generarNombreCorto(nom, unidad) {
     let n = nom.toLowerCase();
     if(n.includes("formativa")) return `Act. Formativa U${unidad}`;
     if(n.includes("sumativa")) return `Act. Sumativa U${unidad}`;
     return nom.length > 35 ? nom.substring(0,32) + "..." : nom;
 }
-
 function parsearFechaMoodle(texto) {
     if (!texto || /cierre del curso/i.test(texto)) return null;
     let t = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -318,7 +288,6 @@ function parsearFechaMoodle(texto) {
     let anio = matchAnio ? parseInt(matchAnio[1]) : new Date().getFullYear();
     return new Date(anio, mesIdx, dia);
 }
-
 // LÓGICA DE DETECCIÓN DE CICLOS Y ASIGNATURAS SEMESTRALES (20 SEMANAS)
 function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFechas) {
     let nom = normalizarTexto(nombreCurso);
@@ -376,7 +345,6 @@ function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFe
     
     return "1er Ciclo";
 }
-
 function obtenerNumeroUnidad(nombreColumna) {
     let texto = normalizarTexto(nombreColumna);
     let numeros = texto.match(/\d+/g);
@@ -389,7 +357,6 @@ function obtenerNumeroUnidad(nombreColumna) {
     if (/\bi\b/.test(texto)) return 1;
     return null;
 }
-
 function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
     if (actId && mapaActividadUnidad[actId] && mapaActividadUnidad[actId] <= totalUnidades) {
         return mapaActividadUnidad[actId];
@@ -399,7 +366,6 @@ function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
     if (numNombre !== null && numNombre <= totalUnidades && numNombre > 0) return numNombre;
     return (idxCol !== -1 && idxCol < totalUnidades) ? idxCol + 1 : (totalUnidades || 1);
 }
-
 function obtenerColorRendimiento(pct, fLimite) {
     let ahora = new Date();
     if (fLimite && ahora < fLimite) {
@@ -409,7 +375,6 @@ function obtenerColorRendimiento(pct, fLimite) {
     if (pct < 90) return '#fdebd0';  
     return '#e8f8f5';               
 }
-
 function configurarColorAcceso(pAcceso) {
     let txt = pAcceso.toLowerCase();
     if (/nunca|mes|año/i.test(txt)) return '#c0392b'; 
@@ -421,7 +386,6 @@ function configurarColorAcceso(pAcceso) {
     }
     return '#27ae60'; 
 }
-
 function iniciarPanelUI(){
     document.body.innerHTML=`<div id="panel-auditoria" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(245,247,250,0.98);z-index:9999;display:flex;justify-content:center;align-items:center;font-family:sans-serif;overflow-y:auto;"><div style="background:white;padding:35px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1);text-align:center;width:480px;border:1px solid #e1e8ed;max-height:95vh;overflow-y:auto;"><h2 style="background:linear-gradient(135deg,#cc609b,#ff89c9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;color:#cc609b;margin:0 0 10px 0;font-size:26px;font-weight:bold;letter-spacing:-0.5px;">Revisor eCampus (Escuela de Psicología)</h2><p style="color:#555;font-size:15px;margin:0 0 20px 0;font-weight:bold;">¿Qué deseas hacer?</p><button id="btnGeneral" style="width:100%;background:#27ae60;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;margin-bottom:20px;transition:0.2s;">🚀 Revisión General de Asignaturas</button><div style="border-top:2px dashed #e1e8ed;margin:20px 0;"></div><h3 style="color:#7f8c8d;font-size:14px;margin-bottom:12px;text-align:left;font-weight:bold;">🔍 Búsqueda Rápida por Estudiante:</h3><input type="email" id="correoEstudiante" placeholder="Correo exacto del estudiante" style="width:100%;padding:11px;box-sizing:border-box;border:2px solid #bdc3c7;border-radius:8px;font-size:13px;margin-bottom:15px;outline:none;"><button id="btnEstudiante" style="width:100%;background:#2980b9;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;transition:0.2s;">👤 Buscar en Todas las Aulas</button></div></div>`;
     document.getElementById('btnGeneral').addEventListener('click',()=>ejecutarExtractor(null));
@@ -431,7 +395,6 @@ function iniciarPanelUI(){
         ejecutarExtractor(correo);
     });
 }
-
 async function ejecutarExtractor(estudianteObjetivo){
     let esBusquedaEstudiante=estudianteObjetivo!==null;
     let datosExtraidos = [];
@@ -500,7 +463,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                     }
                 }
             }
-
             let rCurso = await fetch(`https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}`);
             let dCurso = new DOMParser().parseFromString(rCurso.ok ? await rCurso.text() : "", "text/html");
             
@@ -513,7 +475,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                 let headerEl = sec.querySelector('.card-header, .sectionname, h3, h4, h5');
                 let headerTxt = headerEl ? normalizarTexto(headerEl.textContent) : '';
                 let esSeccionUnidad = /unidad|\bu\d+\b|modulo|módulo/i.test(headerTxt);
-
                 let textoEl = sec.querySelector('.availabilityinfo, .section_availability, [data-region="availabilityinfo"], .isrestricted');
                 let fecha = "";
                 if (textoEl) {
@@ -536,7 +497,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                     if (m) mapaActividadUnidad[m[1]] = unidadAsignadaSec;
                 });
             });
-
             dCurso.querySelectorAll('.modtype_quiz, .modtype_assign, .activity, li.activity, .course-content li, .card').forEach(actEl => {
                 let link = actEl.querySelector('a[href*="/mod/"]');
                 if (!link) return;
@@ -552,7 +512,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                     mapaActividadFechas[actId] = { apertura: aperturaVal, cierre: cierreVal };
                 }
             });
-
             let arregloUnidades = [];
             for (let idx = 0; idx < fechasSecuenciales.length; idx++) {
                 arregloUnidades.push({
@@ -564,17 +523,17 @@ async function ejecutarExtractor(estudianteObjetivo){
             
             // DETERMINACIÓN DEL CICLO
             let cicloAsignatura = determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFechas);
-
             let filaMaestra=Array.from(d.querySelectorAll('table tr')).find(f=>(f.textContent||"").includes("Nombre / Apellido")||(f.textContent||"").includes("Dirección de correo"));
             if(filaMaestra){
                 let colValidas=[];
                 Array.from(filaMaestra.cells).forEach((celda,idx)=>{
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
                     let nomMin=nom.toLowerCase();
-
-                    let esExcluido = /total|promedio|ad:|diagnost|entrada|caracterizac|encuesta|asistencia|repetici|nota final|calificaci[oó]n final/i.test(nomMin);
+                    
+                    // FILTRADO Y EXCLUSIÓN DE EVALUACIONES (INCLUYE "AD:" Y "ACTIVIDAD DIAGNÓSTICA")
+                    let esExcluido = /total|promedio|ad:|actividad diagn[oó]stica|diagnost|entrada|caracterizac|encuesta|asistencia|repetici|nota final|calificaci[oó]n final/i.test(nomMin);
                     let esEvaluacion = /foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin);
-
+                    
                     if(esEvaluacion && !esExcluido){
                         let linkActividad=celda.querySelector('a[href*="mod/"]');
                         let actId = null;
@@ -582,13 +541,11 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let matchId = linkActividad.href.match(/id=(\d+)/);
                             if (matchId) actId = matchId[1];
                         }
-
                         let esForo = /foro/i.test(nomMin);
                         if (esForo) {
-                            if (/diagnost|entrada|presentac|bienvenid|consult|duda|aviso|novedad|cafeter|social|orientac|tecnic/i.test(nomMin)) {
+                            if (/ad:|actividad diagn[oó]stica|diagnost|entrada|presentac|bienvenid|consult|duda|aviso|novedad|cafeter|social|orientac|tecnic/i.test(nomMin)) {
                                 return; 
                             }
-
                             let esSalaDeClase = /sala de clase/i.test(nomMin);
                             let numUnidadNombre = obtenerNumeroUnidad(nom);
                             let unidadMapa = actId ? mapaActividadUnidad[actId] : null;
@@ -600,7 +557,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                                 return; 
                             }
                         }
-
                         colValidas.push({idx:idx,nom:nom,urlDirecta:linkActividad?linkActividad.href:null, actId: actId});
                     }
                 });
@@ -663,7 +619,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let fechasStr = "No especificada";
                             let textoTermino = "Cierre del curso";
                             let fLimite = null;
-
                             if (fechaCierreEsp) {
                                 let fIni = fechaAperturaEsp || (arregloUnidades[unidadAsignada - 1] ? arregloUnidades[unidadAsignada - 1].inicio : "No especificada");
                                 fechasStr = `<b>Inicio:</b> ${fIni}<br><b>Término:</b> ${fechaCierreEsp}`;
@@ -792,7 +747,6 @@ async function ejecutarExtractor(estudianteObjetivo){
         document.body.innerHTML=`<div style='padding:40px;text-align:center;'><h2 style='color:#c0392b;'>⚠️ No se encontraron resultados</h2><button onclick='location.reload()' style='padding:12px 25px;background:#2980b9;color:white;border:none;border-radius:6px;cursor:pointer;'>Volver</button></div>`;
         return;
     }
-
     let cabeceraSuperior = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid ${esBusquedaEstudiante?'#2980b9':'#27ae60'}; padding-bottom:10px;">
         <h2 style='color:${esBusquedaEstudiante?'#2980b9':'#27ae60'}; margin:0;'>${esBusquedaEstudiante?'👤 Historial: '+estudianteObjetivo:'✅ Auditoría Consolidada (Blindada)'}</h2>
@@ -817,13 +771,11 @@ async function ejecutarExtractor(estudianteObjetivo){
             }).join('')}
         </tr>
     </thead>`;
-
     document.body.innerHTML=`<div style='padding:20px; font-family:sans-serif;'>${cabeceraSuperior}<div style='overflow-x:auto; max-height:85vh; border:1px solid #bdc3c7; box-shadow:0 5px 15px rgba(0,0,0,0.05);'><table id='tablaAuditoria' style='border-collapse:collapse;width:100%;font-size:12px;'>${theadCompleto}<tbody></tbody></table></div></div>`;
     
     document.querySelectorAll('.filtro-col').forEach(input => {
         input.addEventListener('input', renderTabla);
     });
-
     const btnDash = document.getElementById('btnDashboard');
     if (btnDash) {
         btnDash.onclick = () => window.mostrarDashboardModal(datosExtraidos, esBusquedaEstudiante);
@@ -926,7 +878,6 @@ async function ejecutarExtractor(estudianteObjetivo){
     
     renderTabla();
 }
-
 async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
     let urlForoObjetivo=col.urlDirecta&&(col.urlDirecta.includes("mod/forum/view.php")||col.urlDirecta.includes("mod/forum/discuss.php"))?col.urlDirecta:null;
     if(!urlForoObjetivo || !urlForoObjetivo.includes("forum")){
@@ -945,9 +896,8 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
                     let enlacesForo = seccion.querySelectorAll('a[href*="/mod/forum/view.php"], a[href*="/mod/forum/discuss.php"]');
                     enlacesForo.forEach(enlace => {
                         let tituloForo = normalizarTexto(enlace.textContent);
-                        let esForoInvalido = /diagnost|entrada|duda|aviso|presenta|cafeter|tecnic|consult/i.test(tituloForo);
+                        let esForoInvalido = /ad:|actividad diagn[oó]stica|diagnost|entrada|duda|aviso|presenta|cafeter|tecnic|consult/i.test(tituloForo);
                         let esForoValido = /sala de clase|unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(tituloForo);
-
                         if (!esForoInvalido && esForoValido) {
                             forosCandidatos.push({
                                 href: enlace.href,
@@ -1018,6 +968,5 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
         
     }catch(e){return "<span style='color:#7f8c8d;'>⚠️ Error</span>";}
 }
-
 iniciarPanelUI();
 })();
