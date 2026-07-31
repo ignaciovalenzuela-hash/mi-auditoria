@@ -1,8 +1,9 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[51014, 51063, 51098, 51122, 51181, 53631, 51015, 51064, 51099, 51123, 51147, 53632, 51016, 51065, 51100, 51148];
+const ids=[51014, 51063, 51098, 51122, 51181, 53631, 51015, 51064, 51099, 51123, 51147, 53632, 51016, 51065, 51100, 51148, 51183, 53633, 51017];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
 const esperar = ms => new Promise(res => setTimeout(res, ms));
+
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
     let estudiantes = decodeURIComponent(datosCodificados).split('||');
     let listaHtml = estudiantes.map(e => `<li style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">👤 ${e}</li>`).join('');
@@ -23,6 +24,260 @@ window.mostrarEstudiantesSinNota = function(datosCodificados) {
     `;
     document.body.appendChild(div);
 };
+
+window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
+    let modalPrev = document.getElementById('modal-dashboard');
+    if (modalPrev) modalPrev.remove();
+
+    let totalCursos = datosExtraidos.length;
+    let cursosCompletos = 0;
+    let cursosNotasFaltantes = 0;
+    let cursosForosPendientes = 0;
+    let docentesInactivos = 0;
+    
+    let totalEvaluaciones = 0;
+    let evaluacionesCalificadas = 0;
+    let totalForosEvaluados = 0;
+    let forosAtendidos = 0;
+
+    let ciclosMap = {
+        "1er Ciclo": { total: 0, completos: 0, conNotas: 0, conForos: 0 },
+        "2do Ciclo": { total: 0, completos: 0, conNotas: 0, conForos: 0 },
+        "Semestral": { total: 0, completos: 0, conNotas: 0, conForos: 0 }
+    };
+    
+    let docentesAtrasadosMap = {};
+
+    datosExtraidos.forEach(curso => {
+        let ciclo = curso.cicloAsignatura || "Semestral";
+        if (!ciclosMap[ciclo]) {
+            ciclosMap[ciclo] = { total: 0, completos: 0, conNotas: 0, conForos: 0 };
+        }
+        ciclosMap[ciclo].total++;
+
+        let tieneNotasFaltantes = false;
+        let tieneForoFaltante = false;
+        let notasFaltantesTotalCurso = 0;
+        let evalPendientesLista = [];
+
+        curso.items.forEach(item => {
+            totalEvaluaciones++;
+            if (item.faltan === 0) evaluacionesCalificadas++;
+
+            if (item.statusForo !== "No aplica") {
+                totalForosEvaluados++;
+                if (item.statusForo.includes('✅')) forosAtendidos++;
+            }
+
+            if (item.faltan > 0) {
+                let pasoPlazo = true;
+                if (item.fLimite && new Date() < item.fLimite) pasoPlazo = false;
+                if (pasoPlazo) {
+                    tieneNotasFaltantes = true;
+                    notasFaltantesTotalCurso += item.faltan;
+                    evalPendientesLista.push(`${item.colNom} (${item.faltan} sin nota)`);
+                }
+            }
+            if (item.statusForo && item.statusForo.includes('❌ No')) {
+                tieneForoFaltante = true;
+            }
+        });
+
+        let accMin = (curso.pAcceso || "").toLowerCase();
+        let esInactivo = false;
+        if (/nunca|mes|año/.test(accMin)) esInactivo = true;
+        else if (/(día|dia)/.test(accMin)) {
+            let nDias = parseInt(accMin.match(/\d+/)?.[0] || 0);
+            if (nDias >= 7) esInactivo = true;
+        }
+
+        if (esInactivo) docentesInactivos++;
+        if (tieneNotasFaltantes) {
+            cursosNotasFaltantes++;
+            ciclosMap[ciclo].conNotas++;
+        }
+        if (tieneForoFaltante) {
+            cursosForosPendientes++;
+            ciclosMap[ciclo].conForos++;
+        }
+
+        let esCompleto = !tieneNotasFaltantes && !tieneForoFaltante && !esInactivo;
+        if (esCompleto) {
+            cursosCompletos++;
+            ciclosMap[ciclo].completos++;
+        }
+
+        if (tieneNotasFaltantes || tieneForoFaltante || esInactivo) {
+            let keyDocente = (curso.pCorreo && curso.pCorreo.includes('@')) ? curso.pCorreo : curso.pNombre;
+            if (!docentesAtrasadosMap[keyDocente]) {
+                docentesAtrasadosMap[keyDocente] = {
+                    nombre: curso.pNombre,
+                    correo: curso.pCorreo,
+                    acceso: curso.pAcceso,
+                    cAcceso: curso.cAcceso,
+                    esInactivo: esInactivo,
+                    cursos: []
+                };
+            }
+            docentesAtrasadosMap[keyDocente].cursos.push({
+                nombreCurso: curso.nombreCurso,
+                ciclo: curso.cicloAsignatura,
+                notasFaltantes: notasFaltantesTotalCurso,
+                evaluaciones: evalPendientesLista,
+                faltaForo: tieneForoFaltante,
+                celdaAcciones: curso.celdaAcciones
+            });
+        }
+    });
+
+    let pctCumplimiento = totalCursos > 0 ? Math.round((cursosCompletos / totalCursos) * 100) : 0;
+    let pctNotasAlDia = totalEvaluaciones > 0 ? Math.round((evaluacionesCalificadas / totalEvaluaciones) * 100) : 100;
+    let pctForosAlDia = totalForosEvaluados > 0 ? Math.round((forosAtendidos / totalForosEvaluados) * 100) : 100;
+
+    let docentesAtrasadosArr = Object.values(docentesAtrasadosMap).map(d => {
+        let totalNotas = d.cursos.reduce((sum, c) => sum + c.notasFaltantes, 0);
+        let totalForos = d.cursos.filter(c => c.faltaForo).length;
+        let score = totalNotas + (totalForos * 5) + (d.esInactivo ? 10 : 0);
+        return { ...d, totalNotas, totalForos, score };
+    }).sort((a, b) => b.score - a.score);
+
+    let htmlCiclos = Object.keys(ciclosMap).map(cicloKey => {
+        let cData = ciclosMap[cicloKey];
+        if (cData.total === 0) return ''; 
+        let pctComp = Math.round((cData.completos / cData.total) * 100);
+        return `
+            <div style="background:#f8f9fa; border:1px solid #e9ecef; border-radius:8px; padding:15px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <strong style="font-size:15px; color:#2c3e50;">📌 ${cicloKey}</strong>
+                    <span style="font-size:13px; font-weight:bold; color:#27ae60;">${pctComp}% Cumplimiento Global</span>
+                </div>
+                <div style="background:#e0e0e0; border-radius:6px; height:12px; width:100%; overflow:hidden; margin-bottom:8px;">
+                    <div style="background:linear-gradient(90deg, #27ae60, #2ecc71); width:${pctComp}%; height:100%;"></div>
+                </div>
+                <div style="display:flex; gap:15px; font-size:12px; color:#555; flex-wrap:wrap;">
+                    <span>📚 Cursos Auditados: <b>${cData.total}</b></span>
+                    <span style="color:#27ae60;">✅ Al día: <b>${cData.completos}</b></span>
+                    <span style="color:#e67e22;">⚠️ Faltan Calificaciones: <b>${cData.conNotas}</b></span>
+                    <span style="color:#c0392b;">💬 Faltan Moderación Foros: <b>${cData.conForos}</b></span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    let htmlDocentesAtrasados = docentesAtrasadosArr.length > 0 ? docentesAtrasadosArr.map(doc => {
+        let detallesCursos = doc.cursos.map(c => {
+            let evalsText = c.evaluaciones.length > 0 ? `<br><small style="color:#e67e22;">• ${c.evaluaciones.join(', ')}</small>` : '';
+            let foroText = c.faltaForo ? `<br><small style="color:#c0392b;">• Falta moderar foro</small>` : '';
+            return `<b>${c.nombreCurso}</b> <span style="font-size:10px; color:#7f8c8d;">(${c.ciclo})</span>${evalsText}${foroText}`;
+        }).join('<hr style="border:0; border-top:1px dashed #eee; margin:5px 0;">');
+
+        return `
+            <tr>
+                <td style="padding:10px; border:1px solid #ddd; font-weight:bold;">${doc.nombre}<br><small style="color:#7f8c8d; font-weight:normal;">${doc.correo}</small></td>
+                <td style="padding:10px; border:1px solid #ddd; color:${doc.cAcceso}; font-weight:bold; text-align:center;">${doc.acceso}</td>
+                <td style="padding:10px; border:1px solid #ddd; font-size:11px;">${detallesCursos}</td>
+                <td style="padding:10px; border:1px solid #ddd; text-align:center; font-weight:bold; color:#c0392b;">${doc.totalNotas}</td>
+                <td style="padding:10px; border:1px solid #ddd; text-align:center;">${doc.cursos[0]?.celdaAcciones || '-'}</td>
+            </tr>
+        `;
+    }).join('') : `<tr><td colspan="5" style="text-align:center; padding:20px; color:#27ae60; font-weight:bold;">🎉 ¡Sin alertas! Todos los docentes están al día.</td></tr>`;
+
+    let modalDiv = document.createElement('div');
+    modalDiv.id = "modal-dashboard";
+    modalDiv.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:100000; display:flex; justify-content:center; align-items:center; font-family:sans-serif;";
+    
+    modalDiv.innerHTML = `
+        <div style="background:white; border-radius:12px; width:94%; max-width:1200px; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 15px 35px rgba(0,0,0,0.3); overflow:hidden;">
+            
+            <div style="background:linear-gradient(135deg, #2c3e50, #1a252f); color:white; padding:18px 25px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h2 style="margin:0; font-size:20px; font-weight:bold;">📊 Dashboard de Control e Indicadores Académicos</h2>
+                    <p style="margin:4px 0 0 0; font-size:12px; opacity:0.8;">Monitoreo analítico global por Ciclo Académico (1er Ciclo, 2do Ciclo y Semestral)</p>
+                </div>
+                <button onclick="document.getElementById('modal-dashboard').remove()" style="background:#e74c3c; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">❌ Cerrar</button>
+            </div>
+
+            <div style="overflow-y:auto; padding:25px; background:#f4f6f9; flex-grow:1;">
+                
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:15px; margin-bottom:25px;">
+                    <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #2980b9; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">Total Asignaturas</span>
+                        <div style="font-size:26px; font-weight:bold; color:#2c3e50; margin-top:5px;">${totalCursos}</div>
+                    </div>
+                    <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #27ae60; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">Cursos al Día</span>
+                        <div style="font-size:26px; font-weight:bold; color:#27ae60; margin-top:5px;">${cursosCompletos}</div>
+                    </div>
+                    <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #e67e22; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">Pendiente Notas</span>
+                        <div style="font-size:26px; font-weight:bold; color:#e67e22; margin-top:5px;">${cursosNotasFaltantes}</div>
+                    </div>
+                    <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #c0392b; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">Pendiente Foros</span>
+                        <div style="font-size:26px; font-weight:bold; color:#c0392b; margin-top:5px;">${cursosForosPendientes}</div>
+                    </div>
+                    <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #8e44ad; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">Docentes Inactivos (>=7d)</span>
+                        <div style="font-size:26px; font-weight:bold; color:#8e44ad; margin-top:5px;">${docentesInactivos}</div>
+                    </div>
+                    <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #16a085; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">% Cumplimiento Total</span>
+                        <div style="font-size:26px; font-weight:bold; color:#16a085; margin-top:5px;">${pctCumplimiento}%</div>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:25px;">
+                    <div style="background:white; padding:18px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <h4 style="margin:0 0 10px 0; color:#2c3e50; font-size:14px;">📝 Cobertura Global de Calificaciones</h4>
+                        <div style="font-size:22px; font-weight:bold; color:#2980b9; margin-bottom:8px;">${pctNotasAlDia}% de Actividades Evaluadas</div>
+                        <div style="background:#e0e0e0; border-radius:6px; height:10px; overflow:hidden;">
+                            <div style="background:#2980b9; width:${pctNotasAlDia}%; height:100%;"></div>
+                        </div>
+                        <p style="font-size:11px; color:#7f8c8d; margin:8px 0 0 0;">${evaluacionesCalificadas} de ${totalEvaluaciones} evaluaciones totales se encuentran 100% calificadas.</p>
+                    </div>
+
+                    <div style="background:white; padding:18px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <h4 style="margin:0 0 10px 0; color:#2c3e50; font-size:14px;">💬 Cobertura de Moderación en Foros</h4>
+                        <div style="font-size:22px; font-weight:bold; color:#8e44ad; margin-bottom:8px;">${pctForosAlDia}% de Foros Atendidos</div>
+                        <div style="background:#e0e0e0; border-radius:6px; height:10px; overflow:hidden;">
+                            <div style="background:#8e44ad; width:${pctForosAlDia}%; height:100%;"></div>
+                        </div>
+                        <p style="font-size:11px; color:#7f8c8d; margin:8px 0 0 0;">${forosAtendidos} de ${totalForosEvaluados} foros de discusión / sala de clase registran respuestas del docente.</p>
+                    </div>
+                </div>
+
+                <div style="background:white; border-radius:10px; padding:20px; margin-bottom:25px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                    <h3 style="margin:0 0 15px 0; color:#2c3e50; font-size:16px; border-bottom:2px solid #ecf0f1; padding-bottom:8px;">📈 Desglose y Avance por Ciclo Académico</h3>
+                    ${htmlCiclos}
+                </div>
+
+                <div style="background:white; border-radius:10px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                    <h3 style="margin:0 0 15px 0; color:#2c3e50; font-size:16px; border-bottom:2px solid #ecf0f1; padding-bottom:8px;">🚨 Matriz Prioritaria de Intervención Docente</h3>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                            <thead>
+                                <tr style="background:#2c3e50; color:white;">
+                                    <th style="padding:10px; text-align:left;">Docente</th>
+                                    <th style="padding:10px; text-align:center;">Último Acceso</th>
+                                    <th style="padding:10px; text-align:left;">Asignaturas y Pendientes</th>
+                                    <th style="padding:10px; text-align:center;">Total Sin Nota</th>
+                                    <th style="padding:10px; text-align:center;">Acciones Recomendadas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${htmlDocentesAtrasados}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modalDiv);
+};
+
 window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, explicacionCod, despedidaCod) {
     let asunto = decodeURIComponent(asuntoCod);
     let cuerpoTexto = decodeURIComponent(introCod) + decodeURIComponent(detallesCod) + decodeURIComponent(explicacionCod) + decodeURIComponent(despedidaCod);
@@ -37,15 +292,18 @@ window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, e
         console.log("Contenido copiado al portapapeles.");
     }).catch(()=>{});
 };
+
 function normalizarTexto(t){
     return t?t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim():"";
 }
+
 function generarNombreCorto(nom, unidad) {
     let n = nom.toLowerCase();
     if(n.includes("formativa")) return `Act. Formativa U${unidad}`;
     if(n.includes("sumativa")) return `Act. Sumativa U${unidad}`;
     return nom.length > 35 ? nom.substring(0,32) + "..." : nom;
 }
+
 function parsearFechaMoodle(texto) {
     if (!texto || /cierre del curso/i.test(texto)) return null;
     let t = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -60,6 +318,65 @@ function parsearFechaMoodle(texto) {
     let anio = matchAnio ? parseInt(matchAnio[1]) : new Date().getFullYear();
     return new Date(anio, mesIdx, dia);
 }
+
+// LÓGICA DE DETECCIÓN DE CICLOS Y ASIGNATURAS SEMESTRALES (20 SEMANAS)
+function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFechas) {
+    let nom = normalizarTexto(nombreCurso);
+    
+    // 1. Palabras clave directas que definen asignaturas de duración semestral
+    if (/\b(semestral|semestre|taller|practica|práctica|seminario|tesis|memoria|20\s*semanas)\b/i.test(nom)) {
+        return "Semestral";
+    }
+    
+    // 2. Cálculo de duración real en días recopilando todas las fechas posibles
+    let fechasClave = [];
+    
+    if (arregloUnidades && arregloUnidades.length > 0) {
+        arregloUnidades.forEach(u => {
+            let fIni = parsearFechaMoodle(u.inicio);
+            let fFin = parsearFechaMoodle(u.termino);
+            if (fIni) fechasClave.push(fIni);
+            if (fFin) fechasClave.push(fFin);
+        });
+    }
+    
+    if (mapaActividadFechas) {
+        Object.values(mapaActividadFechas).forEach(fObj => {
+            if (fObj.apertura) {
+                let f = parsearFechaMoodle(fObj.apertura);
+                if (f) fechasClave.push(f);
+            }
+            if (fObj.cierre) {
+                let f = parsearFechaMoodle(fObj.cierre);
+                if (f) fechasClave.push(f);
+            }
+        });
+    }
+    
+    if (fechasClave.length >= 2) {
+        fechasClave.sort((a, b) => a - b);
+        let primeraFecha = fechasClave[0];
+        let ultimaFecha = fechasClave[fechasClave.length - 1];
+        let diffDias = Math.round((ultimaFecha.getTime() - primeraFecha.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Si dura 80 o más días (las de 20 semanas duran ~140 días vs ciclos de 8-9 semanas / ~60 días)
+        if (diffDias >= 80) {
+            return "Semestral";
+        }
+    }
+    
+    // 3. Si no supera los 80 días de extensión, clasificamos según el mes de inicio
+    if (fechasClave.length > 0) {
+        let mesInicio = fechasClave[0].getMonth(); 
+        if (mesInicio === 2 || mesInicio === 3) return "1er Ciclo";
+        if (mesInicio === 4 || mesInicio === 5) return "2do Ciclo";
+        if (mesInicio === 7 || mesInicio === 8) return "1er Ciclo";
+        if (mesInicio === 9 || mesInicio === 10) return "2do Ciclo";
+    }
+    
+    return "1er Ciclo";
+}
+
 function obtenerNumeroUnidad(nombreColumna) {
     let texto = normalizarTexto(nombreColumna);
     let numeros = texto.match(/\d+/g);
@@ -72,6 +389,7 @@ function obtenerNumeroUnidad(nombreColumna) {
     if (/\bi\b/.test(texto)) return 1;
     return null;
 }
+
 function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
     if (actId && mapaActividadUnidad[actId] && mapaActividadUnidad[actId] <= totalUnidades) {
         return mapaActividadUnidad[actId];
@@ -81,6 +399,7 @@ function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
     if (numNombre !== null && numNombre <= totalUnidades && numNombre > 0) return numNombre;
     return (idxCol !== -1 && idxCol < totalUnidades) ? idxCol + 1 : (totalUnidades || 1);
 }
+
 function obtenerColorRendimiento(pct, fLimite) {
     let ahora = new Date();
     if (fLimite && ahora < fLimite) {
@@ -90,6 +409,7 @@ function obtenerColorRendimiento(pct, fLimite) {
     if (pct < 90) return '#fdebd0';  
     return '#e8f8f5';               
 }
+
 function configurarColorAcceso(pAcceso) {
     let txt = pAcceso.toLowerCase();
     if (/nunca|mes|año/i.test(txt)) return '#c0392b'; 
@@ -101,6 +421,7 @@ function configurarColorAcceso(pAcceso) {
     }
     return '#27ae60'; 
 }
+
 function iniciarPanelUI(){
     document.body.innerHTML=`<div id="panel-auditoria" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(245,247,250,0.98);z-index:9999;display:flex;justify-content:center;align-items:center;font-family:sans-serif;overflow-y:auto;"><div style="background:white;padding:35px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1);text-align:center;width:480px;border:1px solid #e1e8ed;max-height:95vh;overflow-y:auto;"><h2 style="background:linear-gradient(135deg,#cc609b,#ff89c9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;color:#cc609b;margin:0 0 10px 0;font-size:26px;font-weight:bold;letter-spacing:-0.5px;">Revisor eCampus (Escuela de Psicología)</h2><p style="color:#555;font-size:15px;margin:0 0 20px 0;font-weight:bold;">¿Qué deseas hacer?</p><button id="btnGeneral" style="width:100%;background:#27ae60;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;margin-bottom:20px;transition:0.2s;">🚀 Revisión General de Asignaturas</button><div style="border-top:2px dashed #e1e8ed;margin:20px 0;"></div><h3 style="color:#7f8c8d;font-size:14px;margin-bottom:12px;text-align:left;font-weight:bold;">🔍 Búsqueda Rápida por Estudiante:</h3><input type="email" id="correoEstudiante" placeholder="Correo exacto del estudiante" style="width:100%;padding:11px;box-sizing:border-box;border:2px solid #bdc3c7;border-radius:8px;font-size:13px;margin-bottom:15px;outline:none;"><button id="btnEstudiante" style="width:100%;background:#2980b9;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;transition:0.2s;">👤 Buscar en Todas las Aulas</button></div></div>`;
     document.getElementById('btnGeneral').addEventListener('click',()=>ejecutarExtractor(null));
@@ -110,6 +431,7 @@ function iniciarPanelUI(){
         ejecutarExtractor(correo);
     });
 }
+
 async function ejecutarExtractor(estudianteObjetivo){
     let esBusquedaEstudiante=estudianteObjetivo!==null;
     let datosExtraidos = [];
@@ -178,16 +500,20 @@ async function ejecutarExtractor(estudianteObjetivo){
                     }
                 }
             }
-            // BÚSQUEDA Y EXTRACCIÓN DE FECHAS EN PORTADA
+
             let rCurso = await fetch(`https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}`);
             let dCurso = new DOMParser().parseFromString(rCurso.ok ? await rCurso.text() : "", "text/html");
             
             let fechasSecuenciales = [];
             let mapaActividadUnidad = {}; 
-            let mapaActividadFechas = {}; // Contendrá las fechas explícitas de Apertura y Cierre por evaluación
+            let mapaActividadFechas = {};
             let secciones = dCurso.querySelectorAll('#accordionEx1 > .card, .course-content li.section, .course-content .section');
             
             secciones.forEach(sec => {
+                let headerEl = sec.querySelector('.card-header, .sectionname, h3, h4, h5');
+                let headerTxt = headerEl ? normalizarTexto(headerEl.textContent) : '';
+                let esSeccionUnidad = /unidad|\bu\d+\b|modulo|módulo/i.test(headerTxt);
+
                 let textoEl = sec.querySelector('.availabilityinfo, .section_availability, [data-region="availabilityinfo"], .isrestricted');
                 let fecha = "";
                 if (textoEl) {
@@ -203,14 +529,14 @@ async function ejecutarExtractor(estudianteObjetivo){
                 if (fecha && !fechasSecuenciales.includes(fecha)) fechasSecuenciales.push(fecha);
                 
                 let contadorUnidadMapeada = fechasSecuenciales.length; 
-                let unidadAsignadaSec = contadorUnidadMapeada > 0 ? contadorUnidadMapeada : 1;
+                let unidadAsignadaSec = (contadorUnidadMapeada > 0 || esSeccionUnidad) ? (contadorUnidadMapeada || 1) : null;
                 
                 sec.querySelectorAll('a[href*="/mod/"]').forEach(a => {
                     let m = a.href.match(/id=(\d+)/);
                     if (m) mapaActividadUnidad[m[1]] = unidadAsignadaSec;
                 });
             });
-            // ESCÁNER ESPECÍFICO DE ACTIVIDADES (Evaluación Final / Cuestionarios / Tareas con Apertura y Cierre)
+
             dCurso.querySelectorAll('.modtype_quiz, .modtype_assign, .activity, li.activity, .course-content li, .card').forEach(actEl => {
                 let link = actEl.querySelector('a[href*="/mod/"]');
                 if (!link) return;
@@ -226,6 +552,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                     mapaActividadFechas[actId] = { apertura: aperturaVal, cierre: cierreVal };
                 }
             });
+
             let arregloUnidades = [];
             for (let idx = 0; idx < fechasSecuenciales.length; idx++) {
                 arregloUnidades.push({
@@ -235,42 +562,45 @@ async function ejecutarExtractor(estudianteObjetivo){
                 });
             }
             
-            let cicloAsignatura = "-";
-            if (arregloUnidades.length > 0 && arregloUnidades[0].inicio) {
-                let fInicioPrimera = parsearFechaMoodle(arregloUnidades[0].inicio);
-                let fTerminoUltima = null;
-                
-                if (arregloUnidades[arregloUnidades.length-1].termino && arregloUnidades[arregloUnidades.length-1].termino !== "Cierre del curso") {
-                    fTerminoUltima = parsearFechaMoodle(arregloUnidades[arregloUnidades.length-1].termino);
-                } else if (arregloUnidades.length > 1 && arregloUnidades[arregloUnidades.length-2].termino && arregloUnidades[arregloUnidades.length-2].termino !== "Cierre del curso") {
-                    fTerminoUltima = parsearFechaMoodle(arregloUnidades[arregloUnidades.length-2].termino);
-                }
+            // DETERMINACIÓN DEL CICLO
+            let cicloAsignatura = determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFechas);
 
-                if (fInicioPrimera) {
-                    if (fInicioPrimera.getMonth() === 2) { 
-                        if (fTerminoUltima && (fTerminoUltima.getMonth() === 6 || fTerminoUltima.getMonth() === 7)) { 
-                            cicloAsignatura = "SEMESTRAL";
-                        } else {
-                            cicloAsignatura = "1er Ciclo";
-                        }
-                    } else if (fInicioPrimera.getMonth() === 4) { 
-                        cicloAsignatura = "2do Ciclo";
-                    }
-                }
-            }
             let filaMaestra=Array.from(d.querySelectorAll('table tr')).find(f=>(f.textContent||"").includes("Nombre / Apellido")||(f.textContent||"").includes("Dirección de correo"));
             if(filaMaestra){
                 let colValidas=[];
                 Array.from(filaMaestra.cells).forEach((celda,idx)=>{
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
                     let nomMin=nom.toLowerCase();
-                    if(/foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin) && !/total|promedio|ad:|diagnostica|diagnóstica|repetición|repeticion|nota final|calificaci[oó]n final/i.test(nomMin)){
+
+                    let esExcluido = /total|promedio|ad:|diagnost|entrada|caracterizac|encuesta|asistencia|repetici|nota final|calificaci[oó]n final/i.test(nomMin);
+                    let esEvaluacion = /foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin);
+
+                    if(esEvaluacion && !esExcluido){
                         let linkActividad=celda.querySelector('a[href*="mod/"]');
                         let actId = null;
                         if (linkActividad) {
                             let matchId = linkActividad.href.match(/id=(\d+)/);
                             if (matchId) actId = matchId[1];
                         }
+
+                        let esForo = /foro/i.test(nomMin);
+                        if (esForo) {
+                            if (/diagnost|entrada|presentac|bienvenid|consult|duda|aviso|novedad|cafeter|social|orientac|tecnic/i.test(nomMin)) {
+                                return; 
+                            }
+
+                            let esSalaDeClase = /sala de clase/i.test(nomMin);
+                            let numUnidadNombre = obtenerNumeroUnidad(nom);
+                            let unidadMapa = actId ? mapaActividadUnidad[actId] : null;
+                            let tieneUnidadNombre = /unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(nomMin);
+                            
+                            let esForoValido = esSalaDeClase || (numUnidadNombre !== null && numUnidadNombre > 0) || (unidadMapa !== null && unidadMapa > 0) || tieneUnidadNombre;
+                            
+                            if (!esForoValido) {
+                                return; 
+                            }
+                        }
+
                         colValidas.push({idx:idx,nom:nom,urlDirecta:linkActividad?linkActividad.href:null, actId: actId});
                     }
                 });
@@ -333,7 +663,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let fechasStr = "No especificada";
                             let textoTermino = "Cierre del curso";
                             let fLimite = null;
-                            // SI EXISTE FECHA ESPECÍFICA DE CIERRE (EJ. EXAMEN FINAL)
+
                             if (fechaCierreEsp) {
                                 let fIni = fechaAperturaEsp || (arregloUnidades[unidadAsignada - 1] ? arregloUnidades[unidadAsignada - 1].inicio : "No especificada");
                                 fechasStr = `<b>Inicio:</b> ${fIni}<br><b>Término:</b> ${fechaCierreEsp}`;
@@ -462,11 +792,12 @@ async function ejecutarExtractor(estudianteObjetivo){
         document.body.innerHTML=`<div style='padding:40px;text-align:center;'><h2 style='color:#c0392b;'>⚠️ No se encontraron resultados</h2><button onclick='location.reload()' style='padding:12px 25px;background:#2980b9;color:white;border:none;border-radius:6px;cursor:pointer;'>Volver</button></div>`;
         return;
     }
+
     let cabeceraSuperior = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid ${esBusquedaEstudiante?'#2980b9':'#27ae60'}; padding-bottom:10px;">
         <h2 style='color:${esBusquedaEstudiante?'#2980b9':'#27ae60'}; margin:0;'>${esBusquedaEstudiante?'👤 Historial: '+estudianteObjetivo:'✅ Auditoría Consolidada (Blindada)'}</h2>
         <div>
-            ${!esBusquedaEstudiante ? '<button id="btnDashboard" style="padding:10px 15px; background:#8e44ad; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-right:10px; transition:0.2s;">📊 Dashboard</button>' : ''}
+            <button id="btnDashboard" style="padding:10px 15px; background:#8e44ad; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-right:10px; transition:0.2s;">📊 Dashboard</button>
             <button id="btnExportar" style="padding:10px 15px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-right:10px; transition:0.2s;">📥 Exportar Excel</button>
             <button onclick='location.reload()' style='padding:10px 15px; background:#7f8c8d; color:white; border:none; border-radius:6px; cursor:pointer; transition:0.2s;'>⬅️ Volver</button>
         </div>
@@ -486,11 +817,17 @@ async function ejecutarExtractor(estudianteObjetivo){
             }).join('')}
         </tr>
     </thead>`;
+
     document.body.innerHTML=`<div style='padding:20px; font-family:sans-serif;'>${cabeceraSuperior}<div style='overflow-x:auto; max-height:85vh; border:1px solid #bdc3c7; box-shadow:0 5px 15px rgba(0,0,0,0.05);'><table id='tablaAuditoria' style='border-collapse:collapse;width:100%;font-size:12px;'>${theadCompleto}<tbody></tbody></table></div></div>`;
     
     document.querySelectorAll('.filtro-col').forEach(input => {
         input.addEventListener('input', renderTabla);
     });
+
+    const btnDash = document.getElementById('btnDashboard');
+    if (btnDash) {
+        btnDash.onclick = () => window.mostrarDashboardModal(datosExtraidos, esBusquedaEstudiante);
+    }
     
     const btnExp = document.getElementById('btnExportar');
     if (btnExp) {
@@ -505,93 +842,6 @@ async function ejecutarExtractor(estudianteObjetivo){
             a.href = url;
             a.download = `Auditoria_${new Date().toISOString().split('T')[0]}.xls`;
             a.click();
-        };
-    }
-
-    const btnDash = document.getElementById('btnDashboard');
-    if (btnDash) {
-        btnDash.onclick = () => {
-            let cursosCompletos = 0;
-            let cursosFaltanNotas = 0;
-            let atrasosDocentes = {};
-            let conteoCiclos = {};
-
-            datosExtraidos.forEach(curso => {
-                conteoCiclos[curso.cicloAsignatura] = (conteoCiclos[curso.cicloAsignatura] || 0) + 1;
-                
-                let tieneFaltas = false;
-                if(curso.celdaAcciones && curso.celdaAcciones.length > 0) {
-                    tieneFaltas = true;
-                }
-
-                if(tieneFaltas) {
-                    if(curso.celdaAcciones.includes('Faltan Notas') || curso.celdaAcciones.includes('Todo Pendiente')) {
-                        cursosFaltanNotas++;
-                        atrasosDocentes[curso.pNombre] = (atrasosDocentes[curso.pNombre] || 0) + 1;
-                    } else if(curso.celdaAcciones.includes('Falta Foro') || curso.celdaAcciones.includes('Sin Acceso')) {
-                        atrasosDocentes[curso.pNombre] = (atrasosDocentes[curso.pNombre] || 0) + 1;
-                    }
-                } else {
-                    cursosCompletos++;
-                }
-            });
-
-            let docentesAtrasadosTop = Object.entries(atrasosDocentes).sort((a,b) => b[1] - a[1]).slice(0, 5);
-            let listaDocentesHTML = docentesAtrasadosTop.length > 0 ? docentesAtrasadosTop.map(d => `<li style="margin-bottom:5px; border-bottom:1px solid #ddd; padding-bottom:3px;">👨‍🏫 <b>${d[0]}</b>: ${d[1]} incidencias</li>`).join('') : "<li>No hay docentes con incidencias 🎉</li>";
-
-            let maxCiclo = Math.max(...Object.values(conteoCiclos), 1);
-            let graficoCiclosHTML = Object.entries(conteoCiclos).map(c => {
-                let pct = Math.round((c[1] / maxCiclo) * 100);
-                return `<div style="margin-bottom:8px;">
-                    <span style="font-size:12px; font-weight:bold;">${c[0]} (${c[1]})</span>
-                    <div style="width:100%; background:#ecf0f1; border-radius:4px; height:12px; margin-top:2px;">
-                        <div style="width:${pct}%; background:#3498db; height:100%; border-radius:4px;"></div>
-                    </div>
-                </div>`;
-            }).join('');
-
-            let modal = document.createElement('div');
-            modal.id = 'modal-dashboard-estadisticas';
-            modal.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:100000;display:flex;justify-content:center;align-items:center;";
-            modal.innerHTML = `
-                <div style="background:white;padding:30px;border-radius:12px;width:600px;max-height:85vh;overflow-y:auto;box-shadow:0 15px 35px rgba(0,0,0,0.3);font-family:sans-serif;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #8e44ad;padding-bottom:10px;margin-bottom:20px;">
-                        <h2 style="margin:0;color:#8e44ad;">📊 Dashboard de Revisión</h2>
-                        <button onclick="document.getElementById('modal-dashboard-estadisticas').remove()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#7f8c8d;">&times;</button>
-                    </div>
-                    
-                    <div style="display:flex;gap:15px;margin-bottom:20px;">
-                        <div style="flex:1;background:#e8f8f5;padding:15px;border-radius:8px;text-align:center;border:1px solid #1abc9c;">
-                            <h3 style="margin:0;color:#16a085;font-size:32px;">${cursosCompletos}</h3>
-                            <p style="margin:5px 0 0;font-size:13px;color:#2c3e50;font-weight:bold;">Cursos Completos (Al día)</p>
-                        </div>
-                        <div style="flex:1;background:#fdedec;padding:15px;border-radius:8px;text-align:center;border:1px solid #e74c3c;">
-                            <h3 style="margin:0;color:#c0392b;font-size:32px;">${cursosFaltanNotas}</h3>
-                            <p style="margin:5px 0 0;font-size:13px;color:#2c3e50;font-weight:bold;">Cursos Faltan Notas</p>
-                        </div>
-                        <div style="flex:1;background:#f4f6f7;padding:15px;border-radius:8px;text-align:center;border:1px solid #bdc3c7;">
-                            <h3 style="margin:0;color:#34495e;font-size:32px;">${datosExtraidos.length}</h3>
-                            <p style="margin:5px 0 0;font-size:13px;color:#2c3e50;font-weight:bold;">Total Aulas Revisadas</p>
-                        </div>
-                    </div>
-
-                    <div style="display:flex;gap:20px;">
-                        <div style="flex:1;">
-                            <h4 style="margin:0 0 10px;color:#2980b9;border-bottom:1px solid #eee;padding-bottom:5px;">⚠️ Top Docentes con Atrasos</h4>
-                            <ul style="list-style:none;padding:0;margin:0;font-size:13px;color:#2c3e50;">
-                                ${listaDocentesHTML}
-                            </ul>
-                        </div>
-                        <div style="flex:1;">
-                            <h4 style="margin:0 0 10px;color:#2980b9;border-bottom:1px solid #eee;padding-bottom:5px;">📈 Aulas por Ciclo</h4>
-                            ${graficoCiclosHTML}
-                        </div>
-                    </div>
-
-                    <button onclick="document.getElementById('modal-dashboard-estadisticas').remove()" style="margin-top:25px;width:100%;padding:12px;background:#34495e;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:bold;font-size:15px;">Cerrar Dashboard</button>
-                </div>
-            `;
-            document.body.appendChild(modal);
         };
     }
     
@@ -676,6 +926,7 @@ async function ejecutarExtractor(estudianteObjetivo){
     
     renderTabla();
 }
+
 async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
     let urlForoObjetivo=col.urlDirecta&&(col.urlDirecta.includes("mod/forum/view.php")||col.urlDirecta.includes("mod/forum/discuss.php"))?col.urlDirecta:null;
     if(!urlForoObjetivo || !urlForoObjetivo.includes("forum")){
@@ -694,7 +945,10 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
                     let enlacesForo = seccion.querySelectorAll('a[href*="/mod/forum/view.php"], a[href*="/mod/forum/discuss.php"]');
                     enlacesForo.forEach(enlace => {
                         let tituloForo = normalizarTexto(enlace.textContent);
-                        if (!tituloForo.includes("ad a traves") && !tituloForo.includes("ad ") && !tituloForo.includes("diagnostica") && !tituloForo.includes("duda") && !tituloForo.includes("aviso") && !tituloForo.includes("presenta")) {
+                        let esForoInvalido = /diagnost|entrada|duda|aviso|presenta|cafeter|tecnic|consult/i.test(tituloForo);
+                        let esForoValido = /sala de clase|unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(tituloForo);
+
+                        if (!esForoInvalido && esForoValido) {
                             forosCandidatos.push({
                                 href: enlace.href,
                                 esSalaDeClases: tituloForo.includes("sala de clase") || tituloForo.includes("evaluado")
@@ -764,5 +1018,6 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
         
     }catch(e){return "<span style='color:#7f8c8d;'>⚠️ Error</span>";}
 }
+
 iniciarPanelUI();
 })();
