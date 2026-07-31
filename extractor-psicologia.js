@@ -1,6 +1,6 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[51014, 51063, 51098, 51122, 51181, 53631, 51015, 51064, 51099, 51123, 51147, 53632, 51016, 51065, 51100, 51148, 51183, 53633, 51017, 51066, 51101, 51125, 51149, 53634, 51018, 51067, 51150, 51174, 51185, 53635, 51019, 51020, 51021, 51022, 51023, 51024, 51073, 51103, 51151, 51175, 51025, 51074, 51104, 51128, 51152, 51026, 51075, 51105, 51153, 51177, 51027, 51106, 51130, 51154, 51178, 51028, 51077, 51107, 51131, 51155, 51029, 51078, 51030, 51079, 51031, 51080, 51032, 51081, 51033, 51082, 51034, 51083, 51108, 51132, 51035, 51084, 51109, 51133, 51036, 51085, 51110, 51134, 51037, 51086, 51111, 51135, 51038, 51087, 51112, 51136, 51039, 51040, 51041, 51042, 51043, 51044, 51088, 51113, 51137, 51045, 51089, 51114, 51138, 51046, 51090, 51115, 51139, 51047, 51091, 51116, 51164, 51092, 51117, 51141, 51165, 51049, 51050, 51051, 51052, 51053, 51055, 51094, 51119, 51143, 51167, 51056, 51095, 51120, 51144, 51168, 51057, 51096, 51121, 51145];
+const ids=[51014, 51063, 51098, 51122, 51181, 53631, 51015, 51064, 51099, 51123, 51147, 53632, 51016, 51065, 51100, 51148, 51183, 53633, 51017, 51066];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
 const esperar = ms => new Promise(res => setTimeout(res, ms));
 
@@ -277,31 +277,51 @@ function parsearFechaMoodle(texto) {
     return new Date(anio, mesIdx, dia);
 }
 
-function determinarCicloAsignatura(nombreCurso, arregloUnidades) {
+function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFechas) {
     let nom = normalizarTexto(nombreCurso);
-    if (nom.includes("semestral") || nom.includes("semestre") || nom.includes("taller") || nom.includes("practica")) return "Semestral";
-    
+    if (/semestral|semestre|taller|pr[aá]ctica|seminario|proyecto|titulaci[oó]n|anual/i.test(nom)) {
+        return "Semestral";
+    }
+
     if (arregloUnidades.length > 0) {
         let fInicioPrimera = arregloUnidades[0].inicio ? parsearFechaMoodle(arregloUnidades[0].inicio) : null;
         let fFinUltima = null;
-        let ultimaU = arregloUnidades[arregloUnidades.length - 1];
-        if (ultimaU && ultimaU.termino) {
-            fFinUltima = parsearFechaMoodle(ultimaU.termino);
+
+        // 1. Buscar la fecha de cierre más tardía en las actividades mapeadas
+        if (mapaActividadFechas) {
+            for (let key in mapaActividadFechas) {
+                let fCierre = mapaActividadFechas[key].cierre ? parsearFechaMoodle(mapaActividadFechas[key].cierre) : null;
+                if (fCierre && (!fFinUltima || fCierre > fFinUltima)) {
+                    fFinUltima = fCierre;
+                }
+            }
         }
-        
+
+        // 2. Si no hay fechas de actividades especificaciones, proyectar con la última unidad
+        if (!fFinUltima && arregloUnidades.length > 0) {
+            let ultimaU = arregloUnidades[arregloUnidades.length - 1];
+            if (ultimaU && ultimaU.inicio) {
+                let fUltimaU = parsearFechaMoodle(ultimaU.inicio);
+                if (fUltimaU) {
+                    // Sumamos 28 días (4 semanas) estimadas a la fecha de inicio de la última unidad
+                    fFinUltima = new Date(fUltimaU.getTime() + (28 * 24 * 60 * 60 * 1000));
+                }
+            }
+        }
+
         if (fInicioPrimera) {
-            let mesInicio = fInicioPrimera.getMonth(); 
-            
+            let mesInicio = fInicioPrimera.getMonth();
+
             if (fFinUltima) {
                 let diffDias = Math.round((fFinUltima.getTime() - fInicioPrimera.getTime()) / (1000 * 60 * 60 * 24));
-                // Si la asignatura dura 90 días o más (marzo a julio/agosto), es explícitamente Semestral
-                if (diffDias >= 90) return "Semestral";
+                // Si la asignatura dura 75 días o más (~16-20 semanas), es explícitamente Semestral
+                if (diffDias >= 75) return "Semestral";
 
                 let mesFin = fFinUltima.getMonth();
-                // Marzo/Abril a Julio/Agosto
-                if ((mesInicio === 2 || mesInicio === 3) && mesFin >= 6) return "Semestral";
+                // Marzo/Abril a Junio/Julio/Agosto
+                if ((mesInicio === 2 || mesInicio === 3) && (mesFin >= 5 || mesFin <= 1)) return "Semestral";
                 // Agosto/Septiembre a Diciembre/Enero
-                if ((mesInicio === 7 || mesInicio === 8) && (mesFin >= 11 || mesFin <= 1)) return "Semestral";
+                if ((mesInicio === 7 || mesInicio === 8) && (mesFin >= 10 || mesFin <= 1)) return "Semestral";
             }
             
             if (mesInicio === 2 || mesInicio === 3) return "1er Ciclo";
@@ -498,7 +518,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                 });
             }
             
-            let cicloAsignatura = determinarCicloAsignatura(nombreCurso, arregloUnidades);
+            let cicloAsignatura = determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFechas);
 
             let filaMaestra=Array.from(d.querySelectorAll('table tr')).find(f=>(f.textContent||"").includes("Nombre / Apellido")||(f.textContent||"").includes("Dirección de correo"));
             if(filaMaestra){
@@ -507,11 +527,16 @@ async function ejecutarExtractor(estudianteObjetivo){
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
                     let nomMin=nom.toLowerCase();
 
-                    // EXCLUSIÓN GENERAL DE EVALUACIONES NO CALIFICABLES / DIAGNÓSTICAS
-                    let esExcluido = /total|promedio|ad:|diagnost|entrada|caracterizac|encuesta|asistencia|repetici|nota final|calificaci[oó]n final/i.test(nomMin);
+                    // 🛑 FILTRO 1: DESCARTE TOTAL DE ACTIVIDADES DIAGNÓSTICAS, INFORMATIVAS O NO CALIFICABLES
+                    let esDiagnosticaOExcluida = /diagnost|diagnostic|entrada|caracterizac|encuesta|asistencia|repetici|total|promedio|ad:|nota final|calificaci[oó]n final|bienvenid|presentac|consult|duda|aviso|novedad|cafeter|social|orientac|tecnic/i.test(nomMin);
+
+                    if (esDiagnosticaOExcluida) {
+                        return; // Omitir completamente cualquier actividad diagnóstica
+                    }
+
                     let esEvaluacion = /foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin);
 
-                    if(esEvaluacion && !esExcluido){
+                    if (esEvaluacion) {
                         let linkActividad=celda.querySelector('a[href*="mod/"]');
                         let actId = null;
                         if (linkActividad) {
@@ -521,21 +546,16 @@ async function ejecutarExtractor(estudianteObjetivo){
 
                         let esForo = /foro/i.test(nomMin);
                         if (esForo) {
-                            // FILTRO EXPLICITO DE FOROS: Descartar diagnósticos, avisos, consultas y foros informativos
-                            if (/diagnost|entrada|presentac|bienvenid|consult|duda|aviso|novedad|cafeter|social|orientac|tecnic/i.test(nomMin)) {
-                                return; 
-                            }
-
-                            // INCLUSIÓN ESTRICTA: Debe ser foro "Sala de clase" o pertenecer explícitamente a una Unidad / Evaluación
+                            // 🛑 FILTRO 2: SOLO FOROS EVALUADOS POR UNIDAD O SALA DE CLASE EVALUADA
+                            let tieneUnidadEvaluada = /unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(nomMin);
                             let esSalaDeClase = /sala de clase/i.test(nomMin);
                             let numUnidadNombre = obtenerNumeroUnidad(nom);
                             let unidadMapa = actId ? mapaActividadUnidad[actId] : null;
-                            let tieneUnidadNombre = /unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(nomMin);
-                            
-                            let esForoValido = esSalaDeClase || (numUnidadNombre !== null && numUnidadNombre > 0) || (unidadMapa !== null && unidadMapa > 0) || tieneUnidadNombre;
-                            
-                            if (!esForoValido) {
-                                return; // Descartar cualquier otro foro fuera de Unidad / Sala de Clase
+
+                            let esForoEvaluadoValido = (tieneUnidadEvaluada || esSalaDeClase || (numUnidadNombre !== null && numUnidadNombre > 0) || (unidadMapa !== null && unidadMapa > 0));
+
+                            if (!esForoEvaluadoValido) {
+                                return; // Omitir foros que no pertenezcan explícitamente a evaluación de unidad
                             }
                         }
 
@@ -883,7 +903,7 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
                     let enlacesForo = seccion.querySelectorAll('a[href*="/mod/forum/view.php"], a[href*="/mod/forum/discuss.php"]');
                     enlacesForo.forEach(enlace => {
                         let tituloForo = normalizarTexto(enlace.textContent);
-                        let esForoInvalido = /diagnost|entrada|duda|aviso|presenta|cafeter|tecnic|consult/i.test(tituloForo);
+                        let esForoInvalido = /diagnost|diagnostic|entrada|duda|aviso|presenta|cafeter|tecnic|consult|bienvenid/i.test(tituloForo);
                         let esForoValido = /sala de clase|unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(tituloForo);
 
                         if (!esForoInvalido && esForoValido) {
