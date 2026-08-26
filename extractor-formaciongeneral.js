@@ -1,6 +1,6 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[56087, 56101, 55189, 55203, 55215];
+const ids=[56087,56101,55189,55203,55215];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
 const esperar = ms => new Promise(res => setTimeout(res, ms));
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
