@@ -1,7 +1,6 @@
-(async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[507367,507381,507279];
-const coloresPastel=['#ffffff', '#fcfcfc']; 
+const ids = [507367, 507381, 507279];
+const coloresPastel = ['#ffffff', '#fcfcfc']; 
 
 const esperar = ms => new Promise(res => setTimeout(res, ms));
 
@@ -43,7 +42,7 @@ window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, e
 };
 
 function normalizarTexto(t){
-    return t?t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim():"";
+    return t ? t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim() : "";
 }
 
 function generarNombreCorto(nom, unidad) {
@@ -98,7 +97,7 @@ function obtenerColorRendimiento(pct, fLimite) {
     }
     if (pct < 50) return '#fadbd8';  
     if (pct < 90) return '#fdebd0';  
-    return '#e8f8f5';               
+    return '#e8f8f5';                
 }
 
 function configurarColorAcceso(pAcceso) {
@@ -113,6 +112,22 @@ function configurarColorAcceso(pAcceso) {
     return '#27ae60'; 
 }
 
+async function verificarEstadoForo(col, idCurso, pNombre, pId, dCurso) {
+    if (!col.urlDirecta) return "No aplica";
+    try {
+        let r = await fetch(col.urlDirecta);
+        if (!r.ok) return "⚠️ Error";
+        let text = await r.text();
+        let nomProf = (pNombre || "").toLowerCase().trim();
+        if (nomProf && text.toLowerCase().includes(nomProf)) {
+            return "✅ Participó";
+        }
+        return "❌ No participó";
+    } catch(e) {
+        return "⚠️ Error";
+    }
+}
+
 function iniciarPanelUI(){
     document.body.innerHTML=`<div id="panel-auditoria" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(245,247,250,0.98);z-index:9999;display:flex;justify-content:center;align-items:center;font-family:sans-serif;overflow-y:auto;"><div style="background:white;padding:35px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1);text-align:center;width:480px;border:1px solid #e1e8ed;max-height:95vh;overflow-y:auto;"><h2 style="background:linear-gradient(135deg,#cc609b,#ff89c9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;color:#cc609b;margin:0 0 10px 0;font-size:26px;font-weight:bold;letter-spacing:-0.5px;">Revisor eCampus (Formación General)</h2><p style="color:#555;font-size:15px;margin:0 0 20px 0;font-weight:bold;">¿Qué deseas hacer?</p><button id="btnGeneral" style="width:100%;background:#27ae60;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;margin-bottom:20px;transition:0.2s;">🚀 Revisión General de Asignaturas</button><div style="border-top:2px dashed #e1e8ed;margin:20px 0;"></div><h3 style="color:#7f8c8d;font-size:14px;margin-bottom:12px;text-align:left;font-weight:bold;">🔍 Búsqueda Rápida por Estudiante:</h3><input type="email" id="correoEstudiante" placeholder="Correo exacto del estudiante" style="width:100%;padding:11px;box-sizing:border-box;border:2px solid #bdc3c7;border-radius:8px;font-size:13px;margin-bottom:15px;outline:none;"><button id="btnEstudiante" style="width:100%;background:#2980b9;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;transition:0.2s;">👤 Buscar en Todas las Aulas</button></div></div>`;
     document.getElementById('btnGeneral').addEventListener('click',()=>ejecutarExtractor(null));
@@ -124,7 +139,7 @@ function iniciarPanelUI(){
 }
 
 async function ejecutarExtractor(estudianteObjetivo){
-    let esBusquedaEstudiante=estudianteObjetivo!==null;
+    let esBusquedaEstudiante = estudianteObjetivo !== null;
     let datosExtraidos = [];
     
     document.body.innerHTML=`<div style='position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:9999;padding:50px;font-family:sans-serif;text-align:center;'><h2>${esBusquedaEstudiante?'🔍 Buscando estudiante...':'REVISANDO ASIGNATURAS'}</h2><div style='width:80%;background:#eee;height:20px;margin:20px auto;border-radius:10px;overflow:hidden;'><div id='p' style='width:0%;background:#2980b9;height:100%;transition:0.3s;'></div></div><p id='s'>Mapeando fechas y estructurando unidades...</p><p id='pct'>0%</p></div>`;
@@ -143,7 +158,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                 return;
             }
 
-            if(esBusquedaEstudiante&&!textGrader.toLowerCase().includes(estudianteObjetivo)){
+            if(esBusquedaEstudiante && !textGrader.toLowerCase().includes(estudianteObjetivo)){
                 document.getElementById('p').style.width=((i+1)/ids.length*100)+"%";
                 document.getElementById('pct').textContent=`${i+1}/${ids.length} Aulas`;
                 continue;
@@ -199,7 +214,7 @@ async function ejecutarExtractor(estudianteObjetivo){
             
             let fechasSecuenciales = [];
             let mapaActividadUnidad = {}; 
-            let mapaActividadFechas = {}; // Contendrá las fechas explícitas de Apertura y Cierre por evaluación
+            let mapaActividadFechas = {};
 
             let secciones = dCurso.querySelectorAll('#accordionEx1 > .card, .course-content li.section, .course-content .section');
             
@@ -227,7 +242,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                 });
             });
 
-            // ESCÁNER ESPECÍFICO DE ACTIVIDADES (Evaluación Final / Cuestionarios / Tareas con Apertura y Cierre)
             dCurso.querySelectorAll('.modtype_quiz, .modtype_assign, .activity, li.activity, .course-content li, .card').forEach(actEl => {
                 let link = actEl.querySelector('a[href*="/mod/"]');
                 if (!link) return;
@@ -257,12 +271,17 @@ async function ejecutarExtractor(estudianteObjetivo){
                 });
             }
             
+            /* 🔄 DETECCIÓN DE CICLO ACTUALIZADA (SOPORTA AGOSTO Y 2DO SEMESTRE) */
             let cicloAsignatura = "-";
             if (arregloUnidades.length > 0 && arregloUnidades[0].inicio) {
                 let fInicioPrimera = parsearFechaMoodle(arregloUnidades[0].inicio);
                 if (fInicioPrimera) {
-                    if (fInicioPrimera.getMonth() === 2) cicloAsignatura = "1er Ciclo";
-                    else if (fInicioPrimera.getMonth() === 4) cicloAsignatura = "2do Ciclo";
+                    let mes = fInicioPrimera.getMonth();
+                    if (mes === 2) cicloAsignatura = "1er Ciclo";
+                    else if (mes === 4) cicloAsignatura = "2do Ciclo";
+                    else if (mes === 7) cicloAsignatura = "3er Ciclo / 2do Semestre";
+                    else if (mes === 8) cicloAsignatura = "4to Ciclo / 2do Semestre";
+                    else cicloAsignatura = `Ciclo Mes ${mes + 1}`;
                 }
             }
 
@@ -346,7 +365,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let textoTermino = "Cierre del curso";
                             let fLimite = null;
 
-                            // SI EXISTE FECHA ESPECÍFICA DE CIERRE (EJ. EXAMEN FINAL)
                             if (fechaCierreEsp) {
                                 let fIni = fechaAperturaEsp || (arregloUnidades[unidadAsignada - 1] ? arregloUnidades[unidadAsignada - 1].inicio : "No especificada");
                                 fechasStr = `<b>Inicio:</b> ${fIni}<br><b>Término:</b> ${fechaCierreEsp}`;
@@ -455,244 +473,70 @@ async function ejecutarExtractor(estudianteObjetivo){
                         if(cursoFaltaForo && pCorreo.includes('@')) {
                             let subjForo = encodeURIComponent(`Pendiente participación en foros - ${nombreCurso}`);
                             let intro = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que se encuentra pendiente su participación/moderación en los foros de la asignatura ${nombreCurso}.`);
-                            let despedida = encodeURIComponent(`\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
-                            
-                            arrayBotones.push(`<button onclick="window.enviarCorreoSeguro('${pCorreo}', '${subjForo}', '${intro}', '', '', '${despedida}')" style="display:inline-block;width:100px;padding:6px;background:#c0392b;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Falta Foro</button>`);
-                        }
-                        if(sinAcceso7Dias && pCorreo.includes('@')) {
-                            let subjAcceso = encodeURIComponent(`Alerta de inactividad - ${nombreCurso}`);
-                            let intro = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo debido a que el sistema registra que no ha ingresado a la plataforma por 7 días o más en la asignatura ${nombreCurso}.\n\nLe recordamos la importancia de mantener una revisión constante para el buen desarrollo del curso.`);
-                            let despedida = encodeURIComponent(`\n\nQuedo atento/a ante cualquier inconveniente técnico o personal.\n\nSaludos cordiales.`);
-                            
-                            arrayBotones.push(`<button onclick="window.enviarCorreoSeguro('${pCorreo}', '${subjAcceso}', '${intro}', '', '', '${despedida}')" style="display:inline-block;width:100px;padding:6px;background:#8e44ad;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Sin Acceso</button>`);
+                            let despedida = encodeURIComponent(`\n\nQuedo atento/a ante cualquier duda o consulta.\n\nSaludos cordiales.`);
+                            arrayBotones.push(`<button onclick="window.enviarCorreoSeguro('${pCorreo}', '${subjForo}', '${intro}', '', '', '${despedida}')" style="display:inline-block;width:100px;padding:6px;background:#2980b9;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;margin-top:3px;">✉️ Foro Pendiente</button>`);
                         }
                         
-                        cursoObj.celdaAcciones = arrayBotones.join('<div style="height:6px;"></div>');
+                        cursoObj.arrayBotones = arrayBotones;
                         datosExtraidos.push(cursoObj);
                     }
                 }
             }
-        }catch(e){console.error("Error en aula ID "+ids[i],e);}
-    }
-    
-    if(datosExtraidos.length === 0){
-        document.body.innerHTML=`<div style='padding:40px;text-align:center;'><h2 style='color:#c0392b;'>⚠️ No se encontraron resultados</h2><button onclick='location.reload()' style='padding:12px 25px;background:#2980b9;color:white;border:none;border-radius:6px;cursor:pointer;'>Volver</button></div>`;
-        return;
-    }
-    let cabeceraSuperior = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid ${esBusquedaEstudiante?'#2980b9':'#27ae60'}; padding-bottom:10px;">
-        <h2 style='color:${esBusquedaEstudiante?'#2980b9':'#27ae60'}; margin:0;'>${esBusquedaEstudiante?'👤 Historial: '+estudianteObjetivo:'✅ Auditoría Consolidada (Blindada)'}</h2>
-        <div>
-            <button id="btnExportar" style="padding:10px 15px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-right:10px; transition:0.2s;">📥 Exportar Excel</button>
-            <button onclick='location.reload()' style='padding:10px 15px; background:#7f8c8d; color:white; border:none; border-radius:6px; cursor:pointer; transition:0.2s;'>⬅️ Volver</button>
-        </div>
-    </div>`;
-    
-    let titulosColumnas = esBusquedaEstudiante 
-        ? ['Asignatura', 'Ciclo', 'Docente', 'Fechas Homologadas', 'Evaluación', 'Nota'] 
-        : ['Asignatura', 'Ciclo', 'Docente', 'Correo', 'Último Acceso', 'Acciones Consolidadas', 'Fechas Homologadas', 'Evaluación', '¿Docente Participó?', 'Faltan', 'Alumnos', 'Rendimiento', 'Detalle'];
-    
-    let theadCompleto = `
-    <thead style='background:${esBusquedaEstudiante?'#2980b9':'#27ae60'};color:white;position:sticky;top:0;z-index:10;'>
-        <tr>${titulosColumnas.map(t => `<th style='padding:10px;border:1px solid #bdc3c7;'>${t}</th>`).join('')}</tr>
-        <tr class="fila-filtros" style="background:#eaeded;">
-            ${titulosColumnas.map((_, i) => {
-                if(!esBusquedaEstudiante && (i === 5 || i === 12)) return `<th style='padding:4px;border:1px solid #bdc3c7;'><input class="filtro-col" disabled type="text" style="width:100%;box-sizing:border-box;font-size:11px;padding:5px;border:1px solid #ccc;border-radius:4px;background:#ddd;cursor:not-allowed;"></th>`;
-                return `<th style='padding:4px;border:1px solid #bdc3c7;'><input class="filtro-col" type="text" placeholder="Filtrar..." style="width:100%;box-sizing:border-box;font-size:11px;padding:5px;border:1px solid #ccc;border-radius:4px;outline:none;"></th>`;
-            }).join('')}
-        </tr>
-    </thead>`;
-    document.body.innerHTML=`<div style='padding:20px; font-family:sans-serif;'>${cabeceraSuperior}<div style='overflow-x:auto; max-height:85vh; border:1px solid #bdc3c7; box-shadow:0 5px 15px rgba(0,0,0,0.05);'><table id='tablaAuditoria' style='border-collapse:collapse;width:100%;font-size:12px;'>${theadCompleto}<tbody></tbody></table></div></div>`;
-    
-    document.querySelectorAll('.filtro-col').forEach(input => {
-        input.addEventListener('input', renderTabla);
-    });
-    
-    const btnExp = document.getElementById('btnExportar');
-    if (btnExp) {
-        btnExp.onclick = () => {
-            let table = document.getElementById('tablaAuditoria');
-            let htmlTable = table.outerHTML;
-            htmlTable = htmlTable.replace(/<input[^>]*>/gi, '');
-            htmlTable = htmlTable.replace(/<button[^>]*>.*?<\/button>/gi, '');
-            let blob = new Blob(['\ufeff' + htmlTable], { type: 'application/vnd.ms-excel' });
-            let url = URL.createObjectURL(blob);
-            let a = document.createElement('a');
-            a.href = url;
-            a.download = `Auditoria_${new Date().toISOString().split('T')[0]}.xls`;
-            a.click();
-        };
-    }
-    
-    function renderTabla(){
-        let inputs = Array.from(document.querySelectorAll('.filtro-col')).map(el => el.value.toLowerCase().trim());
-        let html = "";
-        let contador = 0;
-        
-        for(let i = 0; i < datosExtraidos.length; i++){
-            let curso = datosExtraidos[i];
-            
-            let itemsFiltrados = curso.items.filter(item => {
-                if(esBusquedaEstudiante) {
-                    if(inputs[0] && !curso.nombreCurso.toLowerCase().includes(inputs[0])) return false;
-                    if(inputs[1] && !curso.cicloAsignatura.toLowerCase().includes(inputs[1])) return false;
-                    if(inputs[2] && !curso.pNombre.toLowerCase().includes(inputs[2])) return false;
-                    if(inputs[3] && !item.fechasStr.toLowerCase().includes(inputs[3])) return false;
-                    if(inputs[4] && !(item.colNom + " " + item.statusForo).toLowerCase().includes(inputs[4])) return false;
-                    if(inputs[5] && !item.notaTexto.toLowerCase().includes(inputs[5])) return false;
-                    return true;
-                } else {
-                    if(inputs[0] && !curso.nombreCurso.toLowerCase().includes(inputs[0])) return false;
-                    if(inputs[1] && !curso.cicloAsignatura.toLowerCase().includes(inputs[1])) return false;
-                    if(inputs[2] && !curso.pNombre.toLowerCase().includes(inputs[2])) return false;
-                    if(inputs[3] && !curso.pCorreo.toLowerCase().includes(inputs[3])) return false;
-                    if(inputs[4] && !curso.pAcceso.toLowerCase().includes(inputs[4])) return false;
-                    if(inputs[6] && !item.fechasStr.toLowerCase().includes(inputs[6])) return false;
-                    if(inputs[7] && !item.colNom.toLowerCase().includes(inputs[7])) return false;
-                    if(inputs[8] && !item.statusForo.toLowerCase().includes(inputs[8])) return false;
-                    if(inputs[9] && !item.faltan.toString().includes(inputs[9])) return false;
-                    if(inputs[10] && !item.totalAlumnos.toString().includes(inputs[10])) return false;
-                    if(inputs[11] && !(item.rendimiento+"%").includes(inputs[11])) return false;
-                    return true;
-                }
-            });
-            if(itemsFiltrados.length > 0) {
-                let bg = coloresPastel[contador % coloresPastel.length];
-                contador++;
-                let rs = itemsFiltrados.length;
-                
-                for(let k = 0; k < itemsFiltrados.length; k++){
-                    let it = itemsFiltrados[k];
-                    let estiloSeparador = k === 0 ? 'border-top: 3.5px solid #95a5a6;' : '';
-                    html += `<tr style='background-color:${bg};'>`;
-                    if(k === 0) {
-                        if(esBusquedaEstudiante) {
-                            html += `<td rowspan="${rs}" style='padding:12px;border:1px solid #bdc3c7;${estiloSeparador}font-weight:bold;'>${curso.linkAsignatura}</td>
-                                     <td rowspan="${rs}" style='padding:12px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${curso.cicloAsignatura}</td>
-                                     <td rowspan="${rs}" style='padding:12px;border:1px solid #bdc3c7;${estiloSeparador}font-weight:bold;'>${curso.pNombre}</td>`;
-                        } else {
-                            html += `<td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}font-weight:bold;'>${curso.linkAsignatura}</td>
-                                     <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${curso.cicloAsignatura}</td>
-                                     <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}font-weight:bold;'>${curso.pNombre}</td>
-                                     <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}color:#2980b9;'>${curso.pCorreo}</td>
-                                     <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}color:${curso.cAcceso};font-weight:bold;'>${curso.pAcceso}</td>
-                                     <td rowspan="${rs}" style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;vertical-align:middle;'>${curso.celdaAcciones}</td>`;
-                        }
-                    }
-                    if(esBusquedaEstudiante) {
-                        html += `<td style='padding:10px;border:1px solid #bdc3c7;${estiloSeparador} font-size:11px;'>${it.fechasStr}</td>
-                                 <td style='padding:10px;border:1px solid #bdc3c7;${estiloSeparador}'>${it.colNom} ${it.statusForo!=='No aplica'&&!it.statusForo.includes('No')?`(${it.statusForo})`:''}</td>
-                                 <td style='padding:10px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;'>${it.notaTexto}</td></tr>`;
-                    } else {
-                        let bgRendimiento = obtenerColorRendimiento(it.rendimiento, it.fLimite);
-                        let btnDetalle = it.faltan > 0 
-                            ? `<button onclick="window.mostrarEstudiantesSinNota('${encodeURIComponent(it.estudiantesSinNota.join('||'))}')" style="padding:4px 8px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:10px; font-weight:bold;">Ver Alumnos</button>` 
-                            : `<span style="color:#7f8c8d;font-size:10px;">Completo</span>`;
-                        html += `<td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}font-size:11px;'>${it.fechasStr}</td>
-                                 <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}'>${it.colNom}</td>
-                                 <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${it.statusForo}</td>
-                                 <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;color:${it.faltan>0?"#c0392b":"#27ae60"};'>${it.faltan}</td>
-                                 <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${it.totalAlumnos}</td>
-                                 <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;background-color:${bgRendimiento};'>${it.rendimiento}%</td>
-                                 <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;'>${btnDetalle}</td>
-                                 </tr>`;
-                    }
-                }
-            }
+        }catch(e){
+            console.error("Error procesando aula "+ids[i], e);
         }
-        document.querySelector('#tablaAuditoria tbody').innerHTML = html;
     }
-    
-    renderTabla();
+
+    renderizarResultados(datosExtraidos, esBusquedaEstudiante);
 }
 
-async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
-    let urlForoObjetivo=col.urlDirecta&&(col.urlDirecta.includes("mod/forum/view.php")||col.urlDirecta.includes("mod/forum/discuss.php"))?col.urlDirecta:null;
-    if(!urlForoObjetivo || !urlForoObjetivo.includes("forum")){
-        try{
-            let numsCol = normalizarTexto(col.nom).match(/\d+/g) || [];
-            let dCurso = dCursoPreload; 
-            let secciones = dCurso.querySelectorAll('#accordionEx1 > .card, .course-content .section');
-            let forosCandidatos = [];
-            secciones.forEach(seccion => {
-                let header = seccion.querySelector('.card-header h5, .sectionname');
-                let tituloSeccion = header ? normalizarTexto(header.textContent) : '';
-                let numsSeccion = tituloSeccion.match(/\d+/g) || [];
-                let numeroCoincide = true;
-                if (numsCol.length > 0 && numsSeccion.length > 0) numeroCoincide = numsCol.some(n => numsSeccion.includes(n));
-                if (numeroCoincide) {
-                    let enlacesForo = seccion.querySelectorAll('a[href*="/mod/forum/view.php"], a[href*="/mod/forum/discuss.php"]');
-                    enlacesForo.forEach(enlace => {
-                        let tituloForo = normalizarTexto(enlace.textContent);
-                        if (!tituloForo.includes("ad a traves") && !tituloForo.includes("ad ") && !tituloForo.includes("diagnostica") && !tituloForo.includes("duda") && !tituloForo.includes("aviso") && !tituloForo.includes("presenta")) {
-                            forosCandidatos.push({
-                                href: enlace.href,
-                                esSalaDeClases: tituloForo.includes("sala de clase") || tituloForo.includes("evaluado")
-                            });
-                        }
-                    });
-                }
-            });
-            let mejorCandidato = forosCandidatos.find(f => f.esSalaDeClases);
-            if (mejorCandidato) urlForoObjetivo = mejorCandidato.href;
-            else if (forosCandidatos.length > 0) urlForoObjetivo = forosCandidatos[0].href;
-        }catch(e){console.error("Error al rastrear unidad", e)}
+function renderizarResultados(datos, esBusquedaEstudiante) {
+    if(!datos || datos.length === 0) {
+        alert("⚠️ No se encontraron resultados para las asignaturas configuradas o el estudiante buscado.");
+        location.reload();
+        return;
     }
-    
-    if(!urlForoObjetivo) return "<span style='color:#d35400;'>⚠️ No link</span>";
-    let linkDebug = `<br><a href="${urlForoObjetivo}" target="_blank" style="font-size:10px;color:#3498db;text-decoration:none;">🔗 Ver foro</a>`;
-    try{
-        let rForo=await fetch(urlForoObjetivo);
-        if(!rForo.ok) return "<span style='color:#7f8c8d;'>⚠️ Error</span>";
-        let rawHtmlForo = await rForo.text();
-        let profeEncontrado = false;
-        let estudiantes = new Set();
-        if (pId && (rawHtmlForo.includes(`id=${pId}&`) || rawHtmlForo.includes(`id=${pId}"`) || rawHtmlForo.includes(`userid":${pId}`) || rawHtmlForo.includes(`userid":"${pId}"`))) profeEncontrado = true;
-        let dForo = new DOMParser().parseFromString(rawHtmlForo,"text/html");
-        function escanearDoc(doc) {
-            doc.querySelectorAll('aside, nav, header, footer, #block-region-side-pre, #block-region-side-post, .block, .navbar').forEach(el => el.remove());
-            let main = doc.querySelector('#region-main, [role="main"], #maincontent, .course-content') || doc.body;
-            if(pId && main.innerHTML.includes(`id=${pId}`)) profeEncontrado = true;
-            doc.querySelectorAll('.forumpost, article.forum-post, tr.discussion, .discussion-list-item, td.author, a[href*="user/view.php"]').forEach(post => {
-                let html = post.innerHTML || "";
-                if (pId && html.includes(`id=${pId}`)) profeEncontrado = true;
-                let imgAutor = post.querySelector('img.userpicture');
-                let linkAutor = post.tagName.toLowerCase() === 'a' ? post : post.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
-                
-                if(imgAutor || linkAutor){
-                    let n = ((linkAutor ? linkAutor.textContent : "") || (imgAutor ? imgAutor.getAttribute('alt') : "") || "").replace(/Imagen de /gi, "").trim();
-                    if(n.length > 3 && !n.toLowerCase().includes('profesor') && !n.toLowerCase().includes('docente')) estudiantes.add(n);
+
+    let html = `<div style="padding:20px;font-family:sans-serif;background:#f4f6f9;min-height:100vh;">
+        <h2 style="color:#2c3e50;">Resultados de la Auditoría (${datos.length} registro/s)</h2>
+        <button onclick="location.reload()" style="padding:10px 15px;background:#7f8c8d;color:white;border:none;border-radius:6px;cursor:pointer;margin-bottom:20px;font-weight:bold;">🔄 Volver a Inicio</button>`;
+
+    datos.forEach(c => {
+        html += `<div style="background:white;padding:20px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin-bottom:20px;border-left:5px solid #2980b9;">
+            <h3 style="margin:0 0 10px 0;color:#2c3e50;">${c.linkAsignatura} <span style="font-size:13px;color:#7f8c8d;font-weight:normal;">(${c.cicloAsignatura})</span></h3>
+            ${c.pNombre ? `<p style="margin:0 0 10px 0;font-size:13px;"><b>Docente:</b> ${c.pNombre} | <b>Correo:</b> ${c.pCorreo || 'N/A'} | <b>Acceso:</b> <span style="color:${c.cAcceso}">${c.pAcceso}</span></p>` : ''}
+            <table style="width:100%;border-collapse:collapse;font-size:12px;text-align:left;">
+                <thead>
+                    <tr style="background:#ecf0f1;color:#2c3e50;">
+                        <th style="padding:8px;border:1px solid #ddd;">Evaluación</th>
+                        <th style="padding:8px;border:1px solid #ddd;">Fechas</th>
+                        ${esBusquedaEstudiante ? '<th style="padding:8px;border:1px solid #ddd;">Nota</th>' : '<th style="padding:8px;border:1px solid #ddd;">Sin Nota / Total</th><th style="padding:8px;border:1px solid #ddd;">Rendimiento</th>'}
+                        <th style="padding:8px;border:1px solid #ddd;">Estado Foro</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+        c.items.forEach(it => {
+            html += `<tr>
+                <td style="padding:8px;border:1px solid #ddd;"><b>${it.colNom}</b></td>
+                <td style="padding:8px;border:1px solid #ddd;">${it.fechasStr}</td>
+                ${esBusquedaEstudiante ? 
+                    `<td style="padding:8px;border:1px solid #ddd;"><b>${it.notaTexto}</b></td>` : 
+                    `<td style="padding:8px;border:1px solid #ddd;">${it.faltan > 0 ? `<button onclick="window.mostrarEstudiantesSinNota('${encodeURIComponent(it.estudiantesSinNota.join('||'))}')" style="background:#e74c3c;color:white;border:none;border-radius:4px;padding:3px 7px;cursor:pointer;font-size:11px;font-weight:bold;">${it.faltan} faltan</button>` : '✅ Al día'} / ${it.totalAlumnos}</td>
+                     <td style="padding:8px;border:1px solid #ddd;background:${obtenerColorRendimiento(it.rendimiento, it.fLimite)}"><b>${it.rendimiento}%</b></td>`
                 }
-            });
+                <td style="padding:8px;border:1px solid #ddd;">${it.statusForo}</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+        if(c.arrayBotones && c.arrayBotones.length > 0) {
+            html += `<div style="margin-top:15px;display:flex;gap:10px;align-items:center;"><b>Notificar Docente:</b> ${c.arrayBotones.join(' ')}</div>`;
         }
-        escanearDoc(dForo);
-        if(!profeEncontrado) {
-            let linksDebates = Array.from(dForo.querySelectorAll('a[href*="discuss.php?d="]')).map(a => a.href.split('#')[0]);
-            let linksUnicos = [...new Set(linksDebates)].slice(0, 8); 
-            for(let link of linksUnicos) {
-                if(profeEncontrado) break; 
-                try {
-                    let rDeb = await fetch(link);
-                    if(!rDeb.ok) continue;
-                    let textDeb = await rDeb.text();
-                    if (pId && (textDeb.includes(`id=${pId}`) || textDeb.includes(`userid":${pId}`) || textDeb.includes(`userid":"${pId}"`))) {
-                        profeEncontrado = true; break;
-                    }
-                    let docDeb = new DOMParser().parseFromString(textDeb, "text/html");
-                    escanearDoc(docDeb);
-                } catch(e){}
-            }
-        }
-        if(profeEncontrado) return `<span style='color:#27ae60;font-weight:bold;'>✅ Sí</span>${linkDebug}`;
-        
-        let arrEstudiantes = Array.from(estudiantes);
-        if(arrEstudiantes.length === 0) return `<span style='color:#c0392b;font-weight:bold;'>❌ No</span><br><small style='font-size:10px;color:#888;'>Sin discusiones</small>${linkDebug}`;
-        
-        let muestra = arrEstudiantes.slice(0, 2).join(', ');
-        if(arrEstudiantes.length > 2) muestra += '...';
-        return `<span style='color:#c0392b;font-weight:bold;'>❌ No</span><br><small style='font-size:10px;color:#888;'>Alumnos: ${muestra}</small>${linkDebug}`;
-        
-    }catch(e){return "<span style='color:#7f8c8d;'>⚠️ Error</span>";}
+        html += `</div>`;
+    });
+
+    html += `</div>`;
+    document.body.innerHTML = html;
 }
+
+/* Iniciar la interfaz directamente */
 iniciarPanelUI();
-})(); 
