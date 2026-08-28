@@ -1,6 +1,6 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[56087, 56101, 55189, 55203, 55215, 55221, 56088, 56102, 56111, 55190, 55341, 56089, 56103, 56083, 55191, 55204, 55192, 55205, 55216, 55222, 55343, 56090, 56104, 55193, 55206, 56091, 55194, 55207, 56092, 55195, 56093, 55196, 55208, 55217, 56094, 56105, 55197, 55209, 56095, 56195, 55198, 55210, 55218, 55344, 56096, 56106, 56112, 56114, 56097, 56107, 55199, 55211, 55219, 55223, 55345, 56098, 56108, 56113, 55200, 55212, 55346, 56099, 56109, 55201, 55213, 56048, 56051, 56054, 56062, 56221, 56067, 56070, 56194, 56100, 56110, 55202, 55214, 55220, 55224, 55226, 55227, 55228, 55229, 55230, 55231, 55232, 55233, 55234, 55235, 55236, 55237, 55238, 55348, 55349, 55350, 55351, 56049, 56052, 56055, 56057, 56063, 56065, 56068, 56071, 56073, 56075, 56077];
+const ids=[56052, 56055, 56057, 56063, 56065, 56068, 56071, 56073, 56075, 56077];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
 const esperar = ms => new Promise(res => setTimeout(res, ms));
 
@@ -127,6 +127,7 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
         let score = totalNotas + (totalForos * 5) + (d.esInactivo ? 10 : 0);
         return { ...d, totalNotas, totalForos, score };
     }).sort((a, b) => b.score - a.score);
+
     let htmlCiclos = Object.keys(ciclosMap).map(cicloKey => {
         let cData = ciclosMap[cicloKey];
         if (cData.total === 0) return ''; 
@@ -149,6 +150,7 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
             </div>
         `;
     }).join('');
+
     let htmlDocentesAtrasados = docentesAtrasadosArr.length > 0 ? docentesAtrasadosArr.map(doc => {
         let detallesCursos = doc.cursos.map(c => {
             let evalsText = c.evaluaciones.length > 0 ? `<br><small style="color:#e67e22;">• ${c.evaluaciones.join(', ')}</small>` : '';
@@ -165,13 +167,13 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
             </tr>
         `;
     }).join('') : `<tr><td colspan="5" style="text-align:center; padding:20px; color:#27ae60; font-weight:bold;">🎉 ¡Sin alertas! Todos los docentes están al día.</td></tr>`;
+
     let modalDiv = document.createElement('div');
     modalDiv.id = "modal-dashboard";
     modalDiv.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:100000; display:flex; justify-content:center; align-items:center; font-family:sans-serif;";
     
     modalDiv.innerHTML = `
         <div style="background:white; border-radius:12px; width:94%; max-width:1200px; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 15px 35px rgba(0,0,0,0.3); overflow:hidden;">
-            
             <div style="background:linear-gradient(135deg, #2c3e50, #1a252f); color:white; padding:18px 25px; display:flex; justify-content:space-between; align-items:center;">
                 <div>
                     <h2 style="margin:0; font-size:20px; font-weight:bold;">📊 Dashboard de Control e Indicadores Académicos</h2>
@@ -180,7 +182,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
                 <button onclick="document.getElementById('modal-dashboard').remove()" style="background:#e74c3c; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">❌ Cerrar</button>
             </div>
             <div style="overflow-y:auto; padding:25px; background:#f4f6f9; flex-grow:1;">
-                
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:15px; margin-bottom:25px;">
                     <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #2980b9; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
                         <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">Total Asignaturas</span>
@@ -541,10 +542,11 @@ async function ejecutarExtractor(estudianteObjetivo){
                 let colValidas=[];
                 Array.from(filaMaestra.cells).forEach((celda,idx)=>{
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
-                    let nomMin=nom.toLowerCase();
+                    let nomNorm = normalizarTexto(nom); // Normaliza el texto sin acentos
                     
-                    let esExcluido = /total|promedio|ad:|actividad diagn[oó]stica|diagnost|entrada|caracterizac|encuesta|asistencia|repetici|nota final|calificaci[oó]n final/i.test(nomMin);
-                    let esEvaluacion = /foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin);
+                    // 🚨 FILTRADO RIGUROSO: Excluye cualquier evaluación diagnóstica, AD, tests iniciales y totales
+                    let esExcluido = /total|promedio|\bad\b|diagnost|entrada|caracterizac|encuesta|asistencia|repetici|nota final|calificacion final/i.test(nomNorm);
+                    let esEvaluacion = /foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomNorm);
                     
                     if(esEvaluacion && !esExcluido){
                         let linkActividad=celda.querySelector('a[href*="mod/"]');
@@ -553,15 +555,15 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let matchId = linkActividad.href.match(/id=(\d+)/);
                             if (matchId) actId = matchId[1];
                         }
-                        let esForo = /foro/i.test(nomMin);
+                        let esForo = /foro/i.test(nomNorm);
                         if (esForo) {
-                            if (/ad:|actividad diagn[oó]stica|diagnost|entrada|presentac|bienvenid|consult|duda|aviso|novedad|cafeter|social|orientac|tecnic/i.test(nomMin)) {
+                            if (/\bad\b|diagnost|entrada|presentac|bienvenid|consult|duda|aviso|novedad|cafeter|social|orientac|tecnic/i.test(nomNorm)) {
                                 return; 
                             }
-                            let esSalaDeClase = /sala de clase/i.test(nomMin);
+                            let esSalaDeClase = /sala de clase/i.test(nomNorm);
                             let numUnidadNombre = obtenerNumeroUnidad(nom);
                             let unidadMapa = actId ? mapaActividadUnidad[actId] : null;
-                            let tieneUnidadNombre = /unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(nomMin);
+                            let tieneUnidadNombre = /unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(nomNorm);
                             
                             let esForoValido = esSalaDeClase || (numUnidadNombre !== null && numUnidadNombre > 0) || (unidadMapa !== null && unidadMapa > 0) || tieneUnidadNombre;
                             
@@ -715,7 +717,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                         
                         let enc = s => encodeURIComponent(s).replace(/'/g, "%27");
                         let safeCorreo = enc(pCorreo);
-
                         if(listaPendientesMaestra.length > 0 && pCorreo.includes('@')) {
                             let subjTodo = enc(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
                             let intro = enc(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}`);
@@ -913,7 +914,7 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
                     let enlacesForo = seccion.querySelectorAll('a[href*="/mod/forum/view.php"], a[href*="/mod/forum/discuss.php"]');
                     enlacesForo.forEach(enlace => {
                         let tituloForo = normalizarTexto(enlace.textContent);
-                        let esForoInvalido = /ad:|actividad diagn[oó]stica|diagnost|entrada|duda|aviso|presenta|cafeter|tecnic|consult/i.test(tituloForo);
+                        let esForoInvalido = /\bad\b|diagnost|entrada|duda|aviso|presenta|cafeter|tecnic|consult/i.test(tituloForo);
                         let esForoValido = /sala de clase|unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(tituloForo);
                         if (!esForoInvalido && esForoValido) {
                             forosCandidatos.push({
