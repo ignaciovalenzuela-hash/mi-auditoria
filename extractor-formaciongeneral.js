@@ -982,3 +982,4 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
 }
 iniciarPanelUI();
 })();
+ 
