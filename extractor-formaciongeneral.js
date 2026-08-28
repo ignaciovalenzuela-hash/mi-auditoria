@@ -1,4 +1,4 @@
-(async function(){
+async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
 const ids=[56087, 56101, 55189, 55203, 55215, 55221];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
@@ -288,7 +288,8 @@ function parsearFechaMoodle(texto) {
     let anio = matchAnio ? parseInt(matchAnio[1]) : new Date().getFullYear();
     return new Date(anio, mesIdx, dia);
 }
-// LÓGICA DE DETECCIÓN DE CICLOS Y ASIGNATURAS SEMESTRALES (20 SEMANAS)
+
+// LÓGICA DE DETECCIÓN DE CICLOS Y ASIGNATURAS SEMESTRALES REVISADA
 function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFechas) {
     let nom = normalizarTexto(nombreCurso);
     
@@ -297,7 +298,7 @@ function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFe
         return "Semestral";
     }
     
-    // 2. Cálculo de duración real en días recopilando todas las fechas posibles
+    // 2. Recopilación de fechas clave de inicio y término
     let fechasClave = [];
     
     if (arregloUnidades && arregloUnidades.length > 0) {
@@ -326,25 +327,36 @@ function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFe
         fechasClave.sort((a, b) => a - b);
         let primeraFecha = fechasClave[0];
         let ultimaFecha = fechasClave[fechasClave.length - 1];
-        let diffDias = Math.round((ultimaFecha.getTime() - primeraFecha.getTime()) / (1000 * 60 * 60 * 24));
         
-        // Si dura 80 o más días (las de 20 semanas duran ~140 días vs ciclos de 8-9 semanas / ~60 días)
-        if (diffDias >= 80) {
+        let mesInicio = primeraFecha.getMonth(); // 7 = Agosto, 8 = Septiembre, 10 = Noviembre, 11 = Diciembre, 0 = Enero
+        let mesFin = ultimaFecha.getMonth();     // 0 = Enero, 10 = Noviembre, 11 = Diciembre
+        
+        // Agosto - Enero => Semestral
+        if ((mesInicio === 7 || mesInicio === 8) && (mesFin === 0 || mesFin === 1)) {
             return "Semestral";
+        }
+        
+        // Agosto - Noviembre => 1er Ciclo
+        if (mesInicio === 7 || mesInicio === 8) {
+            return "1er Ciclo";
+        }
+        
+        // Noviembre - Enero => 2do Ciclo
+        if (mesInicio === 10 || mesInicio === 11 || mesInicio === 0) {
+            return "2do Ciclo";
         }
     }
     
-    // 3. Si no supera los 80 días de extensión, clasificamos según el mes de inicio
+    // Fallback por mes de inicio si existen pocas fechas registradas
     if (fechasClave.length > 0) {
         let mesInicio = fechasClave[0].getMonth(); 
-        if (mesInicio === 2 || mesInicio === 3) return "1er Ciclo";
-        if (mesInicio === 4 || mesInicio === 5) return "2do Ciclo";
         if (mesInicio === 7 || mesInicio === 8) return "1er Ciclo";
-        if (mesInicio === 9 || mesInicio === 10) return "2do Ciclo";
+        if (mesInicio >= 10 || mesInicio === 0) return "2do Ciclo";
     }
     
     return "1er Ciclo";
 }
+
 function obtenerNumeroUnidad(nombreColumna) {
     let texto = normalizarTexto(nombreColumna);
     let numeros = texto.match(/\d+/g);
