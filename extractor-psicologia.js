@@ -1,6 +1,6 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[55853, 55901, 55933, 55854, 55902, 55934, 55855, 55903, 55935, 55856, 55904, 55936, 55857, 55905, 55937];
+const ids=[55853, 55901, 55933, 55854, 55902, 55934, 55855, 55903, 55935, 55856, 55904, 55936];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
 
 // 🛑 RESGUARDO DE RED: Función para pausar la ejecución de peticiones
@@ -900,11 +900,12 @@ async function ejecutarExtractor(estudianteObjetivo){
     renderTabla();
 }
 
-// 🎯 REVISIÓN DE FOROS PRECISA (Lógica estricta en DOM para evitar falsos positivos)
-async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
-    let urlForoObjetivo=col.urlDirecta&&(col.urlDirecta.includes("mod/forum/view.php")||col.urlDirecta.includes("mod/forum/discuss.php"))?col.urlDirecta:null;
-    if(!urlForoObjetivo || !urlForoObjetivo.includes("forum")){
-        try{
+// 🎯 REVISIÓN DE FOROS PRECISA Y ROBUSTA
+async function verificarEstadoForo(col, idCurso, pNombre, pId, dCursoPreload) {
+    let urlForoObjetivo = col.urlDirecta && (col.urlDirecta.includes("mod/forum/view.php") || col.urlDirecta.includes("mod/forum/discuss.php")) ? col.urlDirecta : null;
+    
+    if (!urlForoObjetivo || !urlForoObjetivo.includes("forum")) {
+        try {
             let numsCol = normalizarTexto(col.nom).match(/\d+/g) || [];
             let dCurso = dCursoPreload; 
             let secciones = dCurso.querySelectorAll('#accordionEx1 > .card, .course-content .section');
@@ -933,69 +934,74 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
             let mejorCandidato = forosCandidatos.find(f => f.esSalaDeClases);
             if (mejorCandidato) urlForoObjetivo = mejorCandidato.href;
             else if (forosCandidatos.length > 0) urlForoObjetivo = forosCandidatos[0].href;
-        }catch(e){console.error("Error al rastrear unidad", e)}
+        } catch(e) { console.error("Error al rastrear unidad", e); }
     }
     
-    if(!urlForoObjetivo) return "<span style='color:#d35400;'>⚠️ No link</span>";
+    if (!urlForoObjetivo) return "<span style='color:#d35400;'>⚠️ No link</span>";
     let linkDebug = `<br><a href="${urlForoObjetivo}" target="_blank" style="font-size:10px;color:#3498db;text-decoration:none;">🔗 Ver foro</a>`;
-    try{
+    
+    try {
         let rForo = await fetchSeguro(urlForoObjetivo);
-        if(!rForo.ok) return "<span style='color:#7f8c8d;'>⚠️ Error</span>";
+        if (!rForo.ok) return "<span style='color:#7f8c8d;'>⚠️ Error</span>";
         
         let dForo = new DOMParser().parseFromString(await rForo.text(), "text/html");
         let profeEncontrado = false;
         let estudiantes = new Set();
 
-        function escanearParticipantes(doc) {
-            // Eliminar paneles laterales para evitar detectar enlaces secundarios
-            doc.querySelectorAll('aside, nav, header, footer, #block-region-side-pre, #block-region-side-post, .block, .navbar').forEach(el => el.remove());
+        // Sub-función que escanea perfiles reales de Moodle en la zona principal
+        function analizarContenidoForo(doc) {
+            let areaPrincipal = doc.querySelector('#region-main, #content, .main-content, #page-content') || doc.body;
+            let userLinks = areaPrincipal.querySelectorAll('a[href*="user/view.php"], a[href*="user/profile.php"]');
             
-            // Inspeccionar las publicaciones e hilos de discusión en el cuerpo del foro
-            doc.querySelectorAll('.forumpost, article.forum-post, tr.discussion, .discussion-list-item').forEach(post => {
-                let autorLink = post.querySelector('.author a[href*="user/view.php"], .author a[href*="user/profile.php"], td.author a[href*="user/view.php"], a[href*="user/view.php"]');
-                if (autorLink) {
-                    let hrefAutor = autorLink.href || "";
-                    if (pId && (hrefAutor.includes(`id=${pId}&`) || hrefAutor.endsWith(`id=${pId}`))) {
-                        profeEncontrado = true;
-                    } else {
-                        let n = autorLink.textContent.replace(/\s+/g, ' ').trim();
-                        if (n.length > 3 && !n.toLowerCase().includes('profesor') && !n.toLowerCase().includes('docente')) {
-                            estudiantes.add(n);
-                        }
+            userLinks.forEach(a => {
+                let href = a.href || "";
+                let matchId = href.match(/[?&]id=(\d+)/);
+                let uid = matchId ? matchId[1] : null;
+                
+                // Comparamos numéricamente el ID del usuario con el ID del profesor
+                if (uid && pId && String(uid) === String(pId)) {
+                    profeEncontrado = true;
+                } else {
+                    let clon = a.cloneNode(true);
+                    clon.querySelectorAll('.userinitials, .initials, .sr-only, .accesshide').forEach(el => el.remove());
+                    let nombre = clon.textContent.replace(/\s+/g, ' ').trim();
+                    
+                    if (nombre && nombre.length > 2 && !nombre.toLowerCase().includes('profesor') && !nombre.toLowerCase().includes('docente')) {
+                        estudiantes.add(nombre);
                     }
                 }
             });
         }
 
-        escanearParticipantes(dForo);
+        // 1. Escanear vista general del foro
+        analizarContenidoForo(dForo);
 
-        // Si no se encuentra al docente en la página principal, buscar dentro de cada tema/debate
-        if(!profeEncontrado) {
-            let linksDebates = Array.from(dForo.querySelectorAll('a[href*="discuss.php?d="]')).map(a => a.href.split('#')[0]);
-            let linksUnicos = [...new Set(linksDebates)].slice(0, 6); 
-            for(let link of linksUnicos) {
-                if(profeEncontrado) break; 
-                try {
-                    let rDeb = await fetchSeguro(link);
-                    if(!rDeb.ok) continue;
-                    let textDeb = await rDeb.text();
-                    let docDeb = new DOMParser().parseFromString(textDeb, "text/html");
-                    escanearParticipantes(docDeb);
-                    await esperar(250); // Pausa leve de seguridad por cada consulta profunda
-                } catch(e){}
-            }
+        // 2. Si el profesor no ha sido detectado aún, revisar los temas/debates abiertos
+        let areaMain = dForo.querySelector('#region-main, #content, .main-content, #page-content') || dForo.body;
+        let linksDebates = Array.from(areaMain.querySelectorAll('a[href*="discuss.php?d="]')).map(a => a.href.split('#')[0]);
+        let linksUnicos = [...new Set(linksDebates)].slice(0, 6);
+
+        for (let link of linksUnicos) {
+            if (profeEncontrado) break;
+            try {
+                let rDeb = await fetchSeguro(link);
+                if (!rDeb.ok) continue;
+                let docDeb = new DOMParser().parseFromString(await rDeb.text(), "text/html");
+                analizarContenidoForo(docDeb);
+                await esperar(250); // Pausa de resguardo por cada debate
+            } catch(e) {}
         }
 
-        if(profeEncontrado) return `<span style='color:#27ae60;font-weight:bold;'>✅ Sí</span>${linkDebug}`;
+        if (profeEncontrado) return `<span style='color:#27ae60;font-weight:bold;'>✅ Sí</span>${linkDebug}`;
         
         let arrEstudiantes = Array.from(estudiantes);
-        if(arrEstudiantes.length === 0) return `<span style='color:#c0392b;font-weight:bold;'>❌ No</span><br><small style='font-size:10px;color:#888;'>Sin discusiones</small>${linkDebug}`;
+        if (arrEstudiantes.length === 0) return `<span style='color:#c0392b;font-weight:bold;'>❌ No</span><br><small style='font-size:10px;color:#888;'>Sin discusiones</small>${linkDebug}`;
         
         let muestra = arrEstudiantes.slice(0, 2).join(', ');
-        if(arrEstudiantes.length > 2) muestra += '...';
+        if (arrEstudiantes.length > 2) muestra += '...';
         return `<span style='color:#c0392b;font-weight:bold;'>❌ No</span><br><small style='font-size:10px;color:#888;'>Alumnos: ${muestra}</small>${linkDebug}`;
         
-    }catch(e){return "<span style='color:#7f8c8d;'>⚠️ Error</span>";}
+    } catch(e) { return "<span style='color:#7f8c8d;'>⚠️ Error</span>"; }
 }
 
 iniciarPanelUI();
