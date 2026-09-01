@@ -1,6 +1,6 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[55853, 55901, 55933, 55854, 55902, 55934, 55855, 55903, 55935, 55856, 55904, 55936, 55857, 55905, 55937, 55858, 55906, 55938, 55980, 55859, 55907];
+const ids=[55853, 55901, 55933, 55854, 55902, 55934, 55855, 55903, 55935, 55856, 55904, 55936, 55857, 55905, 55937, 55858, 55906, 55938, 55980, 55859, 55907, 55939, 55960, 55981, 55860, 55908, 55940, 55961, 55982, 55861, 55909, 55941, 55962, 55983, 55862, 55910, 55942, 55963, 55984, 55863, 55864, 55865, 55866, 55867, 55868, 55911, 55943, 55985, 55869, 55912, 55944, 55965, 55986, 55870, 55913, 55945, 55966, 55987, 55871, 55914, 55946, 55988, 55872, 55915, 55947, 55989, 55873, 55916, 55874, 55917, 55875, 55918, 55876, 55919, 55877, 55920, 55878, 55921, 55948, 55969, 55879, 55922, 55949, 55970, 55880, 55923, 55950, 55971, 55881, 55924, 55951, 55972, 55882, 55925, 55952, 55973, 55883, 55884, 56226, 55885, 55886, 55887, 55888, 55926, 55953, 55974, 55889, 55927, 55954, 55975, 55890, 55928, 55955, 55976, 55891, 55929, 55956, 55977, 55892, 55930, 55957, 55978, 55893, 55894, 55895, 55896, 55897];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
 // 🛑 RESGUARDO DE RED: Función para pausar la ejecución de peticiones
 const esperar = ms => new Promise(res => setTimeout(res, ms));
@@ -560,6 +560,12 @@ async function ejecutarExtractor(estudianteObjetivo){
                         colValidas.push({idx:idx,nom:nom,urlDirecta:linkActividad?linkActividad.href:null, actId: actId});
                     }
                 });
+
+                // 🎯 REGLA DE EXCLUSIÓN: Si existen evaluaciones no formativas (sumativas, controles, exámene, etc.), se descartan las formativas.
+                let tieneOtrasEvaluaciones = colValidas.some(col => !/formativ/i.test(normalizarTexto(col.nom)));
+                if (tieneOtrasEvaluaciones) {
+                    colValidas = colValidas.filter(col => !/formativ/i.test(normalizarTexto(col.nom)));
+                }
                 
                 let filasDatos=d.querySelectorAll('table tbody tr');
                 
