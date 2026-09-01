@@ -1,8 +1,9 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[51185, 53635, 51019, 51075,51090, 51051, 51052];
+const ids=[55853, 55901, 55933, 55854, 55902, 55934, 55855, 55903, 55935, 55856, 55904, 55936, 55857, 55905, 55937, 55858, 55906, 55938, 55980, 55859, 55907, 55939, 55960, 55981, 55860, 55908, 55940, 55961, 55982, 55861, 55909, 55941, 55962, 55983, 55862, 55910, 55942, 55963, 55984, 55863, 55864, 55865, 55866, 55867, 55868, 55911, 55943, 55985, 55869, 55912, 55944, 55965, 55986, 55870, 55913, 55945, 55966, 55987, 55871, 55914, 55946, 55988, 55872, 55915, 55947, 55989, 55873, 55916, 55874, 55917, 55875, 55918, 55876, 55919, 55877, 55920, 55878, 55921, 55948, 55969, 55879, 55922, 55949, 55970, 55880, 55923, 55950, 55971, 55881, 55924, 55951, 55972, 55882, 55925, 55952, 55973, 55883, 55884, 56226, 55885, 55886, 55887, 55888, 55926, 55953, 55974, 55889, 55927, 55954, 55975, 55890, 55928, 55955, 55976, 55891, 55929, 55956, 55977, 55892, 55930, 55957, 55978, 55893, 55894, 55895, 55896, 55897];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
 const esperar = ms => new Promise(res => setTimeout(res, ms));
+
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
     let estudiantes = decodeURIComponent(datosCodificados).split('||');
     let listaHtml = estudiantes.map(e => `<li style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">👤 ${e}</li>`).join('');
@@ -23,6 +24,7 @@ window.mostrarEstudiantesSinNota = function(datosCodificados) {
     `;
     document.body.appendChild(div);
 };
+
 window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
     let modalPrev = document.getElementById('modal-dashboard');
     if (modalPrev) modalPrev.remove();
@@ -125,6 +127,7 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
         let score = totalNotas + (totalForos * 5) + (d.esInactivo ? 10 : 0);
         return { ...d, totalNotas, totalForos, score };
     }).sort((a, b) => b.score - a.score);
+
     let htmlCiclos = Object.keys(ciclosMap).map(cicloKey => {
         let cData = ciclosMap[cicloKey];
         if (cData.total === 0) return ''; 
@@ -147,6 +150,7 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
             </div>
         `;
     }).join('');
+
     let htmlDocentesAtrasados = docentesAtrasadosArr.length > 0 ? docentesAtrasadosArr.map(doc => {
         let detallesCursos = doc.cursos.map(c => {
             let evalsText = c.evaluaciones.length > 0 ? `<br><small style="color:#e67e22;">• ${c.evaluaciones.join(', ')}</small>` : '';
@@ -163,13 +167,13 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
             </tr>
         `;
     }).join('') : `<tr><td colspan="5" style="text-align:center; padding:20px; color:#27ae60; font-weight:bold;">🎉 ¡Sin alertas! Todos los docentes están al día.</td></tr>`;
+
     let modalDiv = document.createElement('div');
     modalDiv.id = "modal-dashboard";
     modalDiv.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:100000; display:flex; justify-content:center; align-items:center; font-family:sans-serif;";
     
     modalDiv.innerHTML = `
         <div style="background:white; border-radius:12px; width:94%; max-width:1200px; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 15px 35px rgba(0,0,0,0.3); overflow:hidden;">
-            
             <div style="background:linear-gradient(135deg, #2c3e50, #1a252f); color:white; padding:18px 25px; display:flex; justify-content:space-between; align-items:center;">
                 <div>
                     <h2 style="margin:0; font-size:20px; font-weight:bold;">📊 Dashboard de Control e Indicadores Académicos</h2>
@@ -178,7 +182,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
                 <button onclick="document.getElementById('modal-dashboard').remove()" style="background:#e74c3c; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">❌ Cerrar</button>
             </div>
             <div style="overflow-y:auto; padding:25px; background:#f4f6f9; flex-grow:1;">
-                
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:15px; margin-bottom:25px;">
                     <div style="background:white; padding:15px; border-radius:10px; border-left:5px solid #2980b9; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
                         <span style="font-size:11px; color:#7f8c8d; font-weight:bold; text-transform:uppercase;">Total Asignaturas</span>
@@ -251,6 +254,7 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
     `;
     document.body.appendChild(modalDiv);
 };
+
 window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, explicacionCod, despedidaCod) {
     let asunto = decodeURIComponent(asuntoCod);
     let cuerpoTexto = decodeURIComponent(introCod) + decodeURIComponent(detallesCod) + decodeURIComponent(explicacionCod) + decodeURIComponent(despedidaCod);
@@ -265,15 +269,18 @@ window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, e
         console.log("Contenido copiado al portapapeles.");
     }).catch(()=>{});
 };
+
 function normalizarTexto(t){
     return t?t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim():"";
 }
+
 function generarNombreCorto(nom, unidad) {
     let n = nom.toLowerCase();
     if(n.includes("formativa")) return `Act. Formativa U${unidad}`;
     if(n.includes("sumativa")) return `Act. Sumativa U${unidad}`;
     return nom.length > 35 ? nom.substring(0,32) + "..." : nom;
 }
+
 function parsearFechaMoodle(texto) {
     if (!texto || /cierre del curso/i.test(texto)) return null;
     let t = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -288,16 +295,14 @@ function parsearFechaMoodle(texto) {
     let anio = matchAnio ? parseInt(matchAnio[1]) : new Date().getFullYear();
     return new Date(anio, mesIdx, dia);
 }
-// LÓGICA DE DETECCIÓN DE CICLOS Y ASIGNATURAS SEMESTRALES (20 SEMANAS)
+
 function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFechas) {
     let nom = normalizarTexto(nombreCurso);
     
-    // 1. Palabras clave directas que definen asignaturas de duración semestral
     if (/\b(semestral|semestre|taller|practica|práctica|seminario|tesis|memoria|20\s*semanas)\b/i.test(nom)) {
         return "Semestral";
     }
     
-    // 2. Cálculo de duración real en días recopilando todas las fechas posibles
     let fechasClave = [];
     
     if (arregloUnidades && arregloUnidades.length > 0) {
@@ -326,25 +331,30 @@ function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFe
         fechasClave.sort((a, b) => a - b);
         let primeraFecha = fechasClave[0];
         let ultimaFecha = fechasClave[fechasClave.length - 1];
-        let diffDias = Math.round((ultimaFecha.getTime() - primeraFecha.getTime()) / (1000 * 60 * 60 * 24));
         
-        // Si dura 80 o más días (las de 20 semanas duran ~140 días vs ciclos de 8-9 semanas / ~60 días)
-        if (diffDias >= 80) {
+        let mesInicio = primeraFecha.getMonth(); 
+        let mesFin = ultimaFecha.getMonth();     
+        
+        if ((mesInicio === 7 || mesInicio === 8) && (mesFin === 0 || mesFin === 1)) {
             return "Semestral";
+        }
+        if (mesInicio === 7 || mesInicio === 8) {
+            return "1er Ciclo";
+        }
+        if (mesInicio === 10 || mesInicio === 11 || mesInicio === 0) {
+            return "2do Ciclo";
         }
     }
     
-    // 3. Si no supera los 80 días de extensión, clasificamos según el mes de inicio
     if (fechasClave.length > 0) {
         let mesInicio = fechasClave[0].getMonth(); 
-        if (mesInicio === 2 || mesInicio === 3) return "1er Ciclo";
-        if (mesInicio === 4 || mesInicio === 5) return "2do Ciclo";
         if (mesInicio === 7 || mesInicio === 8) return "1er Ciclo";
-        if (mesInicio === 9 || mesInicio === 10) return "2do Ciclo";
+        if (mesInicio >= 10 || mesInicio === 0) return "2do Ciclo";
     }
     
     return "1er Ciclo";
 }
+
 function obtenerNumeroUnidad(nombreColumna) {
     let texto = normalizarTexto(nombreColumna);
     let numeros = texto.match(/\d+/g);
@@ -357,6 +367,7 @@ function obtenerNumeroUnidad(nombreColumna) {
     if (/\bi\b/.test(texto)) return 1;
     return null;
 }
+
 function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
     if (actId && mapaActividadUnidad[actId] && mapaActividadUnidad[actId] <= totalUnidades) {
         return mapaActividadUnidad[actId];
@@ -366,6 +377,7 @@ function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
     if (numNombre !== null && numNombre <= totalUnidades && numNombre > 0) return numNombre;
     return (idxCol !== -1 && idxCol < totalUnidades) ? idxCol + 1 : (totalUnidades || 1);
 }
+
 function obtenerColorRendimiento(pct, fLimite) {
     let ahora = new Date();
     if (fLimite && ahora < fLimite) {
@@ -375,6 +387,7 @@ function obtenerColorRendimiento(pct, fLimite) {
     if (pct < 90) return '#fdebd0';  
     return '#e8f8f5';               
 }
+
 function configurarColorAcceso(pAcceso) {
     let txt = pAcceso.toLowerCase();
     if (/nunca|mes|año/i.test(txt)) return '#c0392b'; 
@@ -386,6 +399,7 @@ function configurarColorAcceso(pAcceso) {
     }
     return '#27ae60'; 
 }
+
 function iniciarPanelUI(){
     document.body.innerHTML=`<div id="panel-auditoria" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(245,247,250,0.98);z-index:9999;display:flex;justify-content:center;align-items:center;font-family:sans-serif;overflow-y:auto;"><div style="background:white;padding:35px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1);text-align:center;width:480px;border:1px solid #e1e8ed;max-height:95vh;overflow-y:auto;"><h2 style="background:linear-gradient(135deg,#cc609b,#ff89c9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;color:#cc609b;margin:0 0 10px 0;font-size:26px;font-weight:bold;letter-spacing:-0.5px;">Revisor eCampus (Escuela de Psicología)</h2><p style="color:#555;font-size:15px;margin:0 0 20px 0;font-weight:bold;">¿Qué deseas hacer?</p><button id="btnGeneral" style="width:100%;background:#27ae60;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;margin-bottom:20px;transition:0.2s;">🚀 Revisión General de Asignaturas</button><div style="border-top:2px dashed #e1e8ed;margin:20px 0;"></div><h3 style="color:#7f8c8d;font-size:14px;margin-bottom:12px;text-align:left;font-weight:bold;">🔍 Búsqueda Rápida por Estudiante:</h3><input type="email" id="correoEstudiante" placeholder="Correo exacto del estudiante" style="width:100%;padding:11px;box-sizing:border-box;border:2px solid #bdc3c7;border-radius:8px;font-size:13px;margin-bottom:15px;outline:none;"><button id="btnEstudiante" style="width:100%;background:#2980b9;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;transition:0.2s;">👤 Buscar en Todas las Aulas</button></div></div>`;
     document.getElementById('btnGeneral').addEventListener('click',()=>ejecutarExtractor(null));
@@ -395,6 +409,7 @@ function iniciarPanelUI(){
         ejecutarExtractor(correo);
     });
 }
+
 async function ejecutarExtractor(estudianteObjetivo){
     let esBusquedaEstudiante=estudianteObjetivo!==null;
     let datosExtraidos = [];
@@ -521,18 +536,17 @@ async function ejecutarExtractor(estudianteObjetivo){
                 });
             }
             
-            // DETERMINACIÓN DEL CICLO
             let cicloAsignatura = determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFechas);
             let filaMaestra=Array.from(d.querySelectorAll('table tr')).find(f=>(f.textContent||"").includes("Nombre / Apellido")||(f.textContent||"").includes("Dirección de correo"));
             if(filaMaestra){
                 let colValidas=[];
                 Array.from(filaMaestra.cells).forEach((celda,idx)=>{
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
-                    let nomMin=nom.toLowerCase();
+                    let nomNorm = normalizarTexto(nom); // Normaliza el texto sin acentos
                     
-                    // FILTRADO Y EXCLUSIÓN DE EVALUACIONES (INCLUYE "AD:" Y "ACTIVIDAD DIAGNÓSTICA")
-                    let esExcluido = /total|promedio|ad:|actividad diagn[oó]stica|diagnost|entrada|caracterizac|encuesta|asistencia|repetici|nota final|calificaci[oó]n final/i.test(nomMin);
-                    let esEvaluacion = /foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomMin);
+                    // 🚨 FILTRADO RIGUROSO: Excluye cualquier evaluación diagnóstica, AD, tests iniciales y totales
+                    let esExcluido = /total|promedio|\bad\b|diagnost|entrada|caracterizac|encuesta|asistencia|repetici|nota final|calificacion final/i.test(nomNorm);
+                    let esEvaluacion = /foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomNorm);
                     
                     if(esEvaluacion && !esExcluido){
                         let linkActividad=celda.querySelector('a[href*="mod/"]');
@@ -541,15 +555,15 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let matchId = linkActividad.href.match(/id=(\d+)/);
                             if (matchId) actId = matchId[1];
                         }
-                        let esForo = /foro/i.test(nomMin);
+                        let esForo = /foro/i.test(nomNorm);
                         if (esForo) {
-                            if (/ad:|actividad diagn[oó]stica|diagnost|entrada|presentac|bienvenid|consult|duda|aviso|novedad|cafeter|social|orientac|tecnic/i.test(nomMin)) {
+                            if (/\bad\b|diagnost|entrada|presentac|bienvenid|consult|duda|aviso|novedad|cafeter|social|orientac|tecnic/i.test(nomNorm)) {
                                 return; 
                             }
-                            let esSalaDeClase = /sala de clase/i.test(nomMin);
+                            let esSalaDeClase = /sala de clase/i.test(nomNorm);
                             let numUnidadNombre = obtenerNumeroUnidad(nom);
                             let unidadMapa = actId ? mapaActividadUnidad[actId] : null;
-                            let tieneUnidadNombre = /unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(nomMin);
+                            let tieneUnidadNombre = /unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(nomNorm);
                             
                             let esForoValido = esSalaDeClase || (numUnidadNombre !== null && numUnidadNombre > 0) || (unidadMapa !== null && unidadMapa > 0) || tieneUnidadNombre;
                             
@@ -701,38 +715,40 @@ async function ejecutarExtractor(estudianteObjetivo){
                         if(cursoFaltaForo) listaPendientesMaestra.push("- Participación, respuesta o moderación en los foros de discusión.");
                         if(tieneNotasParaTodoPendiente) listaPendientesMaestra.push("- Ingreso de calificaciones pendientes en el libro de notas (plazo de revisión cumplido).");
                         
+                        let enc = s => encodeURIComponent(s).replace(/'/g, "%27");
+                        let safeCorreo = enc(pCorreo);
                         if(listaPendientesMaestra.length > 0 && pCorreo.includes('@')) {
-                            let subjTodo = encodeURIComponent(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
-                            let intro = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}`);
-                            let detalles = encodeURIComponent(tieneNotasParaTodoPendiente ? `\n\nActividades con calificaciones pendientes:${resumenNotasTodoPendiente}` : '');
-                            let explicacion = encodeURIComponent(tieneNotasParaTodoPendiente ? `\n\n${textoExplicacionCeros}` : '');
-                            let despedida = encodeURIComponent(`\n\nLe recordamos la importancia de mantener estas actividades al día para el correcto seguimiento de nuestros estudiantes.\n\nQuedo atento/a ante cualquier duda o inconveniente técnico.\n\nSaludos cordiales.`);
+                            let subjTodo = enc(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
+                            let intro = enc(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}`);
+                            let detalles = enc(tieneNotasParaTodoPendiente ? `\n\nActividades con calificaciones pendientes:${resumenNotasTodoPendiente}` : '');
+                            let explicacion = enc(tieneNotasParaTodoPendiente ? `\n\n${textoExplicacionCeros}` : '');
+                            let despedida = enc(`\n\nLe recordamos la importancia de mantener estas actividades al día para el correcto seguimiento de nuestros estudiantes.\n\nQuedo atento/a ante cualquier duda o inconveniente técnico.\n\nSaludos cordiales.`);
                             
-                            arrayBotones.push(`<button onclick="window.enviarCorreoSeguro('${pCorreo}', '${subjTodo}', '${intro}', '${detalles}', '${explicacion}', '${despedida}')" style="display:inline-block;width:100px;padding:6px;background:#34495e;color:white;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;border:1px solid #2c3e50;cursor:pointer;">✉️ Todo Pendiente</button>`);
+                            arrayBotones.push(`<button onclick="window.enviarCorreoSeguro('${safeCorreo}', '${subjTodo}', '${intro}', '${detalles}', '${explicacion}', '${despedida}')" style="display:inline-block;width:100px;padding:6px;background:#34495e;color:white;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;border:1px solid #2c3e50;cursor:pointer;">✉️ Todo Pendiente</button>`);
                             arrayBotones.push(`<div style="height:4px; border-bottom:1px dashed #ccc; margin-bottom:4px;"></div>`);
                         }
                         if(cursoFaltanNotas && pCorreo.includes('@')) {
-                            let subjNotas = encodeURIComponent(`Pendiente ingreso de calificaciones - ${nombreCurso}`);
-                            let intro = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que existen calificaciones pendientes por ingresar en la asignatura ${nombreCurso}:`);
-                            let detalles = encodeURIComponent(`\n${resumenNotasFaltantes}`);
-                            let explicacion = encodeURIComponent(`\n\n${textoExplicacionCeros}`);
-                            let despedida = encodeURIComponent(`\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
+                            let subjNotas = enc(`Pendiente ingreso de calificaciones - ${nombreCurso}`);
+                            let intro = enc(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que existen calificaciones pendientes por ingresar en la asignatura ${nombreCurso}:`);
+                            let detalles = enc(`\n${resumenNotasFaltantes}`);
+                            let explicacion = enc(`\n\n${textoExplicacionCeros}`);
+                            let despedida = enc(`\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
                             
-                            arrayBotones.push(`<button onclick="window.enviarCorreoSeguro('${pCorreo}', '${subjNotas}', '${intro}', '${detalles}', '${explicacion}', '${despedida}')" style="display:inline-block;width:100px;padding:6px;background:#e67e22;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Faltan Notas</button>`);
+                            arrayBotones.push(`<button onclick="window.enviarCorreoSeguro('${safeCorreo}', '${subjNotas}', '${intro}', '${detalles}', '${explicacion}', '${despedida}')" style="display:inline-block;width:100px;padding:6px;background:#e67e22;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Faltan Notas</button>`);
                         }
                         if(cursoFaltaForo && pCorreo.includes('@')) {
-                            let subjForo = encodeURIComponent(`Pendiente participación en foros - ${nombreCurso}`);
-                            let intro = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que se encuentra pendiente su participación/moderación en los foros de la asignatura ${nombreCurso}.`);
-                            let despedida = encodeURIComponent(`\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
+                            let subjForo = enc(`Pendiente participación en foros - ${nombreCurso}`);
+                            let intro = enc(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para recordarle que se encuentra pendiente su participación/moderación en los foros de la asignatura ${nombreCurso}.`);
+                            let despedida = enc(`\n\nQuedo atento/a ante cualquier duda o problema con la plataforma.\n\nSaludos cordiales.`);
                             
-                            arrayBotones.push(`<button onclick="window.enviarCorreoSeguro('${pCorreo}', '${subjForo}', '${intro}', '', '', '${despedida}')" style="display:inline-block;width:100px;padding:6px;background:#c0392b;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Falta Foro</button>`);
+                            arrayBotones.push(`<button onclick="window.enviarCorreoSeguro('${safeCorreo}', '${subjForo}', '${intro}', '', '', '${despedida}')" style="display:inline-block;width:100px;padding:6px;background:#c0392b;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Falta Foro</button>`);
                         }
                         if(sinAcceso7Dias && pCorreo.includes('@')) {
-                            let subjAcceso = encodeURIComponent(`Alerta de inactividad - ${nombreCurso}`);
-                            let intro = encodeURIComponent(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo debido a que el sistema registra que no ha ingresado a la plataforma por 7 días o más en la asignatura ${nombreCurso}.\n\nLe recordamos la importancia de mantener una revisión constante para el buen desarrollo del curso.`);
-                            let despedida = encodeURIComponent(`\n\nQuedo atento/a ante cualquier inconveniente técnico o personal.\n\nSaludos cordiales.`);
+                            let subjAcceso = enc(`Alerta de inactividad - ${nombreCurso}`);
+                            let intro = enc(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo debido a que el sistema registra que no ha ingresado a la plataforma por 7 días o más en la asignatura ${nombreCurso}.\n\nLe recordamos la importancia de mantener una revisión constante para el buen desarrollo del curso.`);
+                            let despedida = enc(`\n\nQuedo atento/a ante cualquier inconveniente técnico o personal.\n\nSaludos cordiales.`);
                             
-                            arrayBotones.push(`<button onclick="window.enviarCorreoSeguro('${pCorreo}', '${subjAcceso}', '${intro}', '', '', '${despedida}')" style="display:inline-block;width:100px;padding:6px;background:#8e44ad;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Sin Acceso</button>`);
+                            arrayBotones.push(`<button onclick="window.enviarCorreoSeguro('${safeCorreo}', '${subjAcceso}', '${intro}', '', '', '${despedida}')" style="display:inline-block;width:100px;padding:6px;background:#8e44ad;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">✉️ Sin Acceso</button>`);
                         }
                         
                         cursoObj.celdaAcciones = arrayBotones.join('<div style="height:6px;"></div>');
@@ -858,8 +874,9 @@ async function ejecutarExtractor(estudianteObjetivo){
                                  <td style='padding:10px;border:1px solid #bdc3c7;${estiloSeparador}text-align:center;font-weight:bold;'>${it.notaTexto}</td></tr>`;
                     } else {
                         let bgRendimiento = obtenerColorRendimiento(it.rendimiento, it.fLimite);
+                        let safeEstudiantes = encodeURIComponent(it.estudiantesSinNota.join('||')).replace(/'/g, "%27");
                         let btnDetalle = it.faltan > 0 
-                            ? `<button onclick="window.mostrarEstudiantesSinNota('${encodeURIComponent(it.estudiantesSinNota.join('||'))}')" style="padding:4px 8px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:10px; font-weight:bold;">Ver Alumnos</button>` 
+                            ? `<button onclick="window.mostrarEstudiantesSinNota('${safeEstudiantes}')" style="padding:4px 8px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:10px; font-weight:bold;">Ver Alumnos</button>` 
                             : `<span style="color:#7f8c8d;font-size:10px;">Completo</span>`;
                         html += `<td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}font-size:11px;'>${it.fechasStr}</td>
                                  <td style='padding:8px;border:1px solid #bdc3c7;${estiloSeparador}'>${it.colNom}</td>
@@ -878,6 +895,7 @@ async function ejecutarExtractor(estudianteObjetivo){
     
     renderTabla();
 }
+
 async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
     let urlForoObjetivo=col.urlDirecta&&(col.urlDirecta.includes("mod/forum/view.php")||col.urlDirecta.includes("mod/forum/discuss.php"))?col.urlDirecta:null;
     if(!urlForoObjetivo || !urlForoObjetivo.includes("forum")){
@@ -896,7 +914,7 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
                     let enlacesForo = seccion.querySelectorAll('a[href*="/mod/forum/view.php"], a[href*="/mod/forum/discuss.php"]');
                     enlacesForo.forEach(enlace => {
                         let tituloForo = normalizarTexto(enlace.textContent);
-                        let esForoInvalido = /ad:|actividad diagn[oó]stica|diagnost|entrada|duda|aviso|presenta|cafeter|tecnic|consult/i.test(tituloForo);
+                        let esForoInvalido = /\bad\b|diagnost|entrada|duda|aviso|presenta|cafeter|tecnic|consult/i.test(tituloForo);
                         let esForoValido = /sala de clase|unidad|\bu\d+\b|sumativ|formativ|evaluad/i.test(tituloForo);
                         if (!esForoInvalido && esForoValido) {
                             forosCandidatos.push({
@@ -968,5 +986,6 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
         
     }catch(e){return "<span style='color:#7f8c8d;'>⚠️ Error</span>";}
 }
+
 iniciarPanelUI();
 })();
