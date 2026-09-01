@@ -1,11 +1,9 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[55853, 55901, 55933, 55854, 55902, 55934, 55855, 55903, 55935, 55856, 55904, 55936];
+const ids=[55853, 55901, 55933, 55854, 55902, 55934, 55855, 55903, 55935, 55856, 55904, 55936, 55857, 55905, 55937, 55858, 55906, 55938, 55980, 55859, 55907];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
-
 // 🛑 RESGUARDO DE RED: Función para pausar la ejecución de peticiones
 const esperar = ms => new Promise(res => setTimeout(res, ms));
-
 // 🛑 RESGUARDO DE SISTEMA: Fetch con protección contra caídas de red, tiempo límite y control de tasa
 async function fetchSeguro(url, maxReintentos = 3) {
     for (let i = 0; i < maxReintentos; i++) {
@@ -24,7 +22,6 @@ async function fetchSeguro(url, maxReintentos = 3) {
     }
     return { ok: false };
 }
-
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
     let estudiantes = decodeURIComponent(datosCodificados).split('||');
     let listaHtml = estudiantes.map(e => `<li style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">👤 ${e}</li>`).join('');
@@ -45,7 +42,6 @@ window.mostrarEstudiantesSinNota = function(datosCodificados) {
     `;
     document.body.appendChild(div);
 };
-
 window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
     let modalPrev = document.getElementById('modal-dashboard');
     if (modalPrev) modalPrev.remove();
@@ -148,7 +144,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
         let score = totalNotas + (totalForos * 5) + (d.esInactivo ? 10 : 0);
         return { ...d, totalNotas, totalForos, score };
     }).sort((a, b) => b.score - a.score);
-
     let htmlCiclos = Object.keys(ciclosMap).map(cicloKey => {
         let cData = ciclosMap[cicloKey];
         if (cData.total === 0) return ''; 
@@ -171,7 +166,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
             </div>
         `;
     }).join('');
-
     let htmlDocentesAtrasados = docentesAtrasadosArr.length > 0 ? docentesAtrasadosArr.map(doc => {
         let detallesCursos = doc.cursos.map(c => {
             let evalsText = c.evaluaciones.length > 0 ? `<br><small style="color:#e67e22;">• ${c.evaluaciones.join(', ')}</small>` : '';
@@ -188,7 +182,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
             </tr>
         `;
     }).join('') : `<tr><td colspan="5" style="text-align:center; padding:20px; color:#27ae60; font-weight:bold;">🎉 ¡Sin alertas! Todos los docentes están al día.</td></tr>`;
-
     let modalDiv = document.createElement('div');
     modalDiv.id = "modal-dashboard";
     modalDiv.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:100000; display:flex; justify-content:center; align-items:center; font-family:sans-serif;";
@@ -275,7 +268,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
     `;
     document.body.appendChild(modalDiv);
 };
-
 window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, explicacionCod, despedidaCod) {
     let asunto = decodeURIComponent(asuntoCod);
     let cuerpoTexto = decodeURIComponent(introCod) + decodeURIComponent(detallesCod) + decodeURIComponent(explicacionCod) + decodeURIComponent(despedidaCod);
@@ -290,18 +282,15 @@ window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, e
         console.log("Contenido copiado al portapapeles.");
     }).catch(()=>{});
 };
-
 function normalizarTexto(t){
     return t?t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim():"";
 }
-
 function generarNombreCorto(nom, unidad) {
     let n = nom.toLowerCase();
     if(n.includes("formativa")) return `Act. Formativa U${unidad}`;
     if(n.includes("sumativa")) return `Act. Sumativa U${unidad}`;
     return nom.length > 35 ? nom.substring(0,32) + "..." : nom;
 }
-
 function parsearFechaMoodle(texto) {
     if (!texto || /cierre del curso/i.test(texto)) return null;
     let t = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -316,7 +305,6 @@ function parsearFechaMoodle(texto) {
     let anio = matchAnio ? parseInt(matchAnio[1]) : new Date().getFullYear();
     return new Date(anio, mesIdx, dia);
 }
-
 function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFechas) {
     let nom = normalizarTexto(nombreCurso);
     if (/\b(semestral|semestre|taller|practica|práctica|seminario|tesis|memoria|20\s*semanas)\b/i.test(nom)) {
@@ -360,7 +348,6 @@ function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFe
     }
     return "1er Ciclo";
 }
-
 function obtenerNumeroUnidad(nombreColumna) {
     let texto = normalizarTexto(nombreColumna);
     let numeros = texto.match(/\d+/g);
@@ -373,7 +360,6 @@ function obtenerNumeroUnidad(nombreColumna) {
     if (/\bi\b/.test(texto)) return 1;
     return null;
 }
-
 function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
     if (actId && mapaActividadUnidad[actId] && mapaActividadUnidad[actId] <= totalUnidades) {
         return mapaActividadUnidad[actId];
@@ -383,7 +369,6 @@ function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
     if (numNombre !== null && numNombre <= totalUnidades && numNombre > 0) return numNombre;
     return (idxCol !== -1 && idxCol < totalUnidades) ? idxCol + 1 : (totalUnidades || 1);
 }
-
 function obtenerColorRendimiento(pct, fLimite) {
     let ahora = new Date();
     if (fLimite && ahora < fLimite) return pct >= 90 ? '#e8f8f5' : '#ffffff'; 
@@ -391,7 +376,6 @@ function obtenerColorRendimiento(pct, fLimite) {
     if (pct < 90) return '#fdebd0';  
     return '#e8f8f5';               
 }
-
 function configurarColorAcceso(pAcceso) {
     let txt = pAcceso.toLowerCase();
     if (/nunca|mes|año/i.test(txt)) return '#c0392b'; 
@@ -403,7 +387,6 @@ function configurarColorAcceso(pAcceso) {
     }
     return '#27ae60'; 
 }
-
 function iniciarPanelUI(){
     document.body.innerHTML=`<div id="panel-auditoria" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(245,247,250,0.98);z-index:9999;display:flex;justify-content:center;align-items:center;font-family:sans-serif;overflow-y:auto;"><div style="background:white;padding:35px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1);text-align:center;width:480px;border:1px solid #e1e8ed;max-height:95vh;overflow-y:auto;"><h2 style="background:linear-gradient(135deg,#cc609b,#ff89c9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;color:#cc609b;margin:0 0 10px 0;font-size:26px;font-weight:bold;letter-spacing:-0.5px;">Revisor eCampus (Escuela de Psicología)</h2><p style="color:#555;font-size:15px;margin:0 0 20px 0;font-weight:bold;">¿Qué deseas hacer?</p><button id="btnGeneral" style="width:100%;background:#27ae60;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;margin-bottom:20px;transition:0.2s;">🚀 Revisión General de Asignaturas</button><div style="border-top:2px dashed #e1e8ed;margin:20px 0;"></div><h3 style="color:#7f8c8d;font-size:14px;margin-bottom:12px;text-align:left;font-weight:bold;">🔍 Búsqueda Rápida por Estudiante:</h3><input type="email" id="correoEstudiante" placeholder="Correo exacto del estudiante" style="width:100%;padding:11px;box-sizing:border-box;border:2px solid #bdc3c7;border-radius:8px;font-size:13px;margin-bottom:15px;outline:none;"><button id="btnEstudiante" style="width:100%;background:#2980b9;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;transition:0.2s;">👤 Buscar en Todas las Aulas</button></div></div>`;
     document.getElementById('btnGeneral').addEventListener('click',()=>ejecutarExtractor(null));
@@ -413,7 +396,6 @@ function iniciarPanelUI(){
         ejecutarExtractor(correo);
     });
 }
-
 async function ejecutarExtractor(estudianteObjetivo){
     let esBusquedaEstudiante=estudianteObjetivo!==null;
     let datosExtraidos = [];
@@ -589,12 +571,16 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let col=colValidas[indiceColumna];
                             let rawNota=filaEstudiante.cells[col.idx]?.textContent||"-";
                             let notaTexto=rawNota.replace(/Acciones de la celda|Análisis de calificaciones|Ver retroalimentación/gi,'').trim()||"-";
-                            let statusForo="No aplica";
-                            if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
                             
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
-                            let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
                             let fechaAperturaEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].apertura : null;
+                            let fIniTexto = fechaAperturaEsp || (arregloUnidades[unidadAsignada - 1] ? arregloUnidades[unidadAsignada - 1].inicio : null);
+                            let fInicioObj = parsearFechaMoodle(fIniTexto);
+
+                            let statusForo="No aplica";
+                            if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso, fInicioObj);
+                            
+                            let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
                             let fechaCierreEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].cierre : null;
                             let fechasStr = "No especificada";
                             if (fechaCierreEsp) {
@@ -627,13 +613,17 @@ async function ejecutarExtractor(estudianteObjetivo){
                             }
                         });
                         if(totalAlumnos>0){
-                            let statusForo="No aplica";
-                            if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
-                            
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
                             let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
                             let fechaAperturaEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].apertura : null;
                             let fechaCierreEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].cierre : null;
+                            
+                            let fIniTexto = fechaAperturaEsp || (arregloUnidades[unidadAsignada - 1] ? arregloUnidades[unidadAsignada - 1].inicio : null);
+                            let fInicioObj = parsearFechaMoodle(fIniTexto);
+
+                            let statusForo="No aplica";
+                            if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso, fInicioObj);
+
                             let fechasStr = "No especificada";
                             let textoTermino = "Cierre del curso";
                             let fLimite = null;
@@ -654,10 +644,10 @@ async function ejecutarExtractor(estudianteObjetivo){
                                 let esExamenFinal = /final|proyecto|integraci|examen/i.test(col.nom);
                                 
                                 if ((totalUn === 4 || totalUn === 5) && (esUnidadFinal || esExamenFinal)) {
-                                    let fInicioObj = parsearFechaMoodle(uObj.inicio);
-                                    if (fInicioObj) {
+                                    let fInicioObjUnit = parsearFechaMoodle(uObj.inicio);
+                                    if (fInicioObjUnit) {
                                         let diasExtra = (totalUn === 4) ? 14 : 35;
-                                        fLimite = new Date(fInicioObj.getTime() + (diasExtra * 24 * 60 * 60 * 1000));
+                                        fLimite = new Date(fInicioObjUnit.getTime() + (diasExtra * 24 * 60 * 60 * 1000));
                                     }
                                 } else {
                                     let fTermino = parsearFechaMoodle(textoTermino);
@@ -901,7 +891,9 @@ async function ejecutarExtractor(estudianteObjetivo){
 }
 
 // 🎯 REVISIÓN DE FOROS PRECISA Y ROBUSTA
-async function verificarEstadoForo(col, idCurso, pNombre, pId, dCursoPreload) {
+async function verificarEstadoForo(col, idCurso, pNombre, pId, dCursoPreload, fInicioObj) {
+    let aunNoInicia = fInicioObj && (new Date() < fInicioObj);
+
     let urlForoObjetivo = col.urlDirecta && (col.urlDirecta.includes("mod/forum/view.php") || col.urlDirecta.includes("mod/forum/discuss.php")) ? col.urlDirecta : null;
     
     if (!urlForoObjetivo || !urlForoObjetivo.includes("forum")) {
@@ -937,18 +929,26 @@ async function verificarEstadoForo(col, idCurso, pNombre, pId, dCursoPreload) {
         } catch(e) { console.error("Error al rastrear unidad", e); }
     }
     
-    if (!urlForoObjetivo) return "<span style='color:#d35400;'>⚠️ No link</span>";
+    if (!urlForoObjetivo) {
+        return aunNoInicia 
+            ? "<span style='color:#f39c12;font-weight:bold;'>🟡 Aún no inicia</span>" 
+            : "<span style='color:#c0392b;font-weight:bold;'>❌ No hay foro</span>";
+    }
+
     let linkDebug = `<br><a href="${urlForoObjetivo}" target="_blank" style="font-size:10px;color:#3498db;text-decoration:none;">🔗 Ver foro</a>`;
     
     try {
         let rForo = await fetchSeguro(urlForoObjetivo);
-        if (!rForo.ok) return "<span style='color:#7f8c8d;'>⚠️ Error</span>";
+        if (!rForo.ok) {
+            return aunNoInicia 
+                ? `<span style='color:#f39c12;font-weight:bold;'>🟡 Aún no inicia</span>${linkDebug}` 
+                : "<span style='color:#7f8c8d;'>⚠️ Error</span>";
+        }
         
         let dForo = new DOMParser().parseFromString(await rForo.text(), "text/html");
         let profeEncontrado = false;
         let estudiantes = new Set();
 
-        // Sub-función que escanea perfiles reales de Moodle en la zona principal
         function analizarContenidoForo(doc) {
             let areaPrincipal = doc.querySelector('#region-main, #content, .main-content, #page-content') || doc.body;
             let userLinks = areaPrincipal.querySelectorAll('a[href*="user/view.php"], a[href*="user/profile.php"]');
@@ -958,7 +958,6 @@ async function verificarEstadoForo(col, idCurso, pNombre, pId, dCursoPreload) {
                 let matchId = href.match(/[?&]id=(\d+)/);
                 let uid = matchId ? matchId[1] : null;
                 
-                // Comparamos numéricamente el ID del usuario con el ID del profesor
                 if (uid && pId && String(uid) === String(pId)) {
                     profeEncontrado = true;
                 } else {
@@ -973,14 +972,11 @@ async function verificarEstadoForo(col, idCurso, pNombre, pId, dCursoPreload) {
             });
         }
 
-        // 1. Escanear vista general del foro
         analizarContenidoForo(dForo);
 
-        // 2. Si el profesor no ha sido detectado aún, revisar los temas/debates abiertos
         let areaMain = dForo.querySelector('#region-main, #content, .main-content, #page-content') || dForo.body;
         let linksDebates = Array.from(areaMain.querySelectorAll('a[href*="discuss.php?d="]')).map(a => a.href.split('#')[0]);
         let linksUnicos = [...new Set(linksDebates)].slice(0, 6);
-
         for (let link of linksUnicos) {
             if (profeEncontrado) break;
             try {
@@ -988,21 +984,30 @@ async function verificarEstadoForo(col, idCurso, pNombre, pId, dCursoPreload) {
                 if (!rDeb.ok) continue;
                 let docDeb = new DOMParser().parseFromString(await rDeb.text(), "text/html");
                 analizarContenidoForo(docDeb);
-                await esperar(250); // Pausa de resguardo por cada debate
+                await esperar(250);
             } catch(e) {}
         }
 
         if (profeEncontrado) return `<span style='color:#27ae60;font-weight:bold;'>✅ Sí</span>${linkDebug}`;
         
+        if (aunNoInicia) {
+            return `<span style='color:#f39c12;font-weight:bold;'>🟡 Aún no inicia</span>${linkDebug}`;
+        }
+
         let arrEstudiantes = Array.from(estudiantes);
-        if (arrEstudiantes.length === 0) return `<span style='color:#c0392b;font-weight:bold;'>❌ No</span><br><small style='font-size:10px;color:#888;'>Sin discusiones</small>${linkDebug}`;
+        if (arrEstudiantes.length === 0) {
+            return `<span style='color:#c0392b;font-weight:bold;'>❌ No hay foro</span><br><small style='font-size:10px;color:#888;'>Sin discusiones</small>${linkDebug}`;
+        }
         
         let muestra = arrEstudiantes.slice(0, 2).join(', ');
         if (arrEstudiantes.length > 2) muestra += '...';
-        return `<span style='color:#c0392b;font-weight:bold;'>❌ No</span><br><small style='font-size:10px;color:#888;'>Alumnos: ${muestra}</small>${linkDebug}`;
+        return `<span style='color:#c0392b;font-weight:bold;'>❌ No hay foro</span><br><small style='font-size:10px;color:#888;'>Alumnos: ${muestra}</small>${linkDebug}`;
         
-    } catch(e) { return "<span style='color:#7f8c8d;'>⚠️ Error</span>"; }
+    } catch(e) { 
+        return aunNoInicia 
+            ? `<span style='color:#f39c12;font-weight:bold;'>🟡 Aún no inicia</span>` 
+            : "<span style='color:#7f8c8d;'>⚠️ Error</span>"; 
+    }
 }
-
 iniciarPanelUI();
 })();
