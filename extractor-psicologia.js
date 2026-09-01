@@ -1,8 +1,29 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[55853, 55901, 55933, 55854, 55902, 55934, 55855, 55903, 55935, 55856, 55904, 55936, 55857, 55905, 55937, 55858, 55906, 55938, 55980, 55859, 55907, 55939, 55960, 55981, 55860, 55908, 55940, 55961, 55982, 55861, 55909, 55941, 55962, 55983, 55862, 55910, 55942, 55963, 55984, 55863, 55864, 55865, 55866, 55867, 55868, 55911, 55943, 55985, 55869, 55912, 55944, 55965, 55986, 55870, 55913, 55945, 55966, 55987, 55871, 55914, 55946, 55988, 55872, 55915, 55947, 55989, 55873, 55916, 55874, 55917, 55875, 55918, 55876, 55919, 55877, 55920, 55878, 55921, 55948, 55969, 55879, 55922, 55949, 55970, 55880, 55923, 55950, 55971, 55881, 55924, 55951, 55972, 55882, 55925, 55952, 55973, 55883, 55884, 56226, 55885, 55886, 55887, 55888, 55926, 55953, 55974, 55889, 55927, 55954, 55975, 55890, 55928, 55955, 55976, 55891, 55929, 55956, 55977, 55892, 55930, 55957, 55978, 55893, 55894, 55895, 55896, 55897];
+const ids=[55853, 55901, 55933, 55854, 55902, 55934, 55855, 55903, 55935, 55856, 55904, 55936, 55857, 55905, 55937];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
+
+// 🛑 RESGUARDO DE RED: Función para pausar la ejecución de peticiones
 const esperar = ms => new Promise(res => setTimeout(res, ms));
+
+// 🛑 RESGUARDO DE SISTEMA: Fetch con protección contra caídas de red, tiempo límite y control de tasa
+async function fetchSeguro(url, maxReintentos = 3) {
+    for (let i = 0; i < maxReintentos; i++) {
+        try {
+            let controller = new AbortController();
+            let timeout = setTimeout(() => controller.abort(), 12000); // Límite de tiempo por consulta (12s)
+            let r = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeout);
+            
+            if (r.ok) return r;
+            if (r.status === 429) await esperar(3000); // Pausa larga si la plataforma reporta sobrecarga
+        } catch (error) {
+            if (i === maxReintentos - 1) return { ok: false, statusText: "Error de red" };
+            await esperar(600 * (i + 1)); // Reintento progresivo
+        }
+    }
+    return { ok: false };
+}
 
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
     let estudiantes = decodeURIComponent(datosCodificados).split('||');
@@ -298,13 +319,10 @@ function parsearFechaMoodle(texto) {
 
 function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFechas) {
     let nom = normalizarTexto(nombreCurso);
-    
     if (/\b(semestral|semestre|taller|practica|práctica|seminario|tesis|memoria|20\s*semanas)\b/i.test(nom)) {
         return "Semestral";
     }
-    
     let fechasClave = [];
-    
     if (arregloUnidades && arregloUnidades.length > 0) {
         arregloUnidades.forEach(u => {
             let fIni = parsearFechaMoodle(u.inicio);
@@ -313,7 +331,6 @@ function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFe
             if (fFin) fechasClave.push(fFin);
         });
     }
-    
     if (mapaActividadFechas) {
         Object.values(mapaActividadFechas).forEach(fObj => {
             if (fObj.apertura) {
@@ -326,32 +343,21 @@ function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFe
             }
         });
     }
-    
     if (fechasClave.length >= 2) {
         fechasClave.sort((a, b) => a - b);
         let primeraFecha = fechasClave[0];
         let ultimaFecha = fechasClave[fechasClave.length - 1];
-        
         let mesInicio = primeraFecha.getMonth(); 
         let mesFin = ultimaFecha.getMonth();     
-        
-        if ((mesInicio === 7 || mesInicio === 8) && (mesFin === 0 || mesFin === 1)) {
-            return "Semestral";
-        }
-        if (mesInicio === 7 || mesInicio === 8) {
-            return "1er Ciclo";
-        }
-        if (mesInicio === 10 || mesInicio === 11 || mesInicio === 0) {
-            return "2do Ciclo";
-        }
+        if ((mesInicio === 7 || mesInicio === 8) && (mesFin === 0 || mesFin === 1)) return "Semestral";
+        if (mesInicio === 7 || mesInicio === 8) return "1er Ciclo";
+        if (mesInicio === 10 || mesInicio === 11 || mesInicio === 0) return "2do Ciclo";
     }
-    
     if (fechasClave.length > 0) {
         let mesInicio = fechasClave[0].getMonth(); 
         if (mesInicio === 7 || mesInicio === 8) return "1er Ciclo";
         if (mesInicio >= 10 || mesInicio === 0) return "2do Ciclo";
     }
-    
     return "1er Ciclo";
 }
 
@@ -380,9 +386,7 @@ function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
 
 function obtenerColorRendimiento(pct, fLimite) {
     let ahora = new Date();
-    if (fLimite && ahora < fLimite) {
-        return pct >= 90 ? '#e8f8f5' : '#ffffff'; 
-    }
+    if (fLimite && ahora < fLimite) return pct >= 90 ? '#e8f8f5' : '#ffffff'; 
     if (pct < 50) return '#fadbd8';  
     if (pct < 90) return '#fdebd0';  
     return '#e8f8f5';               
@@ -418,12 +422,13 @@ async function ejecutarExtractor(estudianteObjetivo){
     
     for(let i=0;i<ids.length;i++){
         try{
-            await esperar(150);
+            // 🛑 RESGUARDO: Pausa entre aulas para evitar congelamientos o caídas del servidor
+            await esperar(300);
             
-            let r=await fetch(`https://e-campus.uniacc.cl/grade/report/grader/index.php?id=${ids[i]}&perpage=5000&collapsed=0`);
+            let r = await fetchSeguro(`https://e-campus.uniacc.cl/grade/report/grader/index.php?id=${ids[i]}&perpage=5000&collapsed=0`);
             if(!r.ok) continue;
             
-            let textGrader=await r.text();
+            let textGrader = await r.text();
             if(textGrader.includes("login/index.php")) {
                 alert("⚠️ Su sesión de eCampus ha expirado. Por favor inicie sesión nuevamente.");
                 location.reload();
@@ -443,7 +448,7 @@ async function ejecutarExtractor(estudianteObjetivo){
             let linkAsignatura = `<a href="https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}" target="_blank" style="color:#2980b9; text-decoration:none;">${nombreCurso}</a>`;
             
             let pNombre="No asignado",pCorreo="No disponible",pAcceso="Nunca ha ingresado",pId=null;
-            let rProf=await fetch(`https://e-campus.uniacc.cl/user/index.php?id=${ids[i]}&perpage=5000`);
+            let rProf = await fetchSeguro(`https://e-campus.uniacc.cl/user/index.php?id=${ids[i]}&perpage=5000`);
             if(rProf.ok){
                 let dProf=new DOMParser().parseFromString(await rProf.text(),"text/html");
                 let idxAcceso=-1;
@@ -478,7 +483,7 @@ async function ejecutarExtractor(estudianteObjetivo){
                     }
                 }
             }
-            let rCurso = await fetch(`https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}`);
+            let rCurso = await fetchSeguro(`https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}`);
             let dCurso = new DOMParser().parseFromString(rCurso.ok ? await rCurso.text() : "", "text/html");
             
             let fechasSecuenciales = [];
@@ -542,9 +547,8 @@ async function ejecutarExtractor(estudianteObjetivo){
                 let colValidas=[];
                 Array.from(filaMaestra.cells).forEach((celda,idx)=>{
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
-                    let nomNorm = normalizarTexto(nom); // Normaliza el texto sin acentos
+                    let nomNorm = normalizarTexto(nom);
                     
-                    // 🚨 FILTRADO RIGUROSO: Excluye cualquier evaluación diagnóstica, AD, tests iniciales y totales
                     let esExcluido = /total|promedio|\bad\b|diagnost|entrada|caracterizac|encuesta|asistencia|repetici|nota final|calificacion final/i.test(nomNorm);
                     let esEvaluacion = /foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomNorm);
                     
@@ -896,6 +900,7 @@ async function ejecutarExtractor(estudianteObjetivo){
     renderTabla();
 }
 
+// 🎯 REVISIÓN DE FOROS PRECISA (Lógica estricta en DOM para evitar falsos positivos)
 async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
     let urlForoObjetivo=col.urlDirecta&&(col.urlDirecta.includes("mod/forum/view.php")||col.urlDirecta.includes("mod/forum/discuss.php"))?col.urlDirecta:null;
     if(!urlForoObjetivo || !urlForoObjetivo.includes("forum")){
@@ -934,47 +939,53 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
     if(!urlForoObjetivo) return "<span style='color:#d35400;'>⚠️ No link</span>";
     let linkDebug = `<br><a href="${urlForoObjetivo}" target="_blank" style="font-size:10px;color:#3498db;text-decoration:none;">🔗 Ver foro</a>`;
     try{
-        let rForo=await fetch(urlForoObjetivo);
+        let rForo = await fetchSeguro(urlForoObjetivo);
         if(!rForo.ok) return "<span style='color:#7f8c8d;'>⚠️ Error</span>";
-        let rawHtmlForo = await rForo.text();
+        
+        let dForo = new DOMParser().parseFromString(await rForo.text(), "text/html");
         let profeEncontrado = false;
         let estudiantes = new Set();
-        if (pId && (rawHtmlForo.includes(`id=${pId}&`) || rawHtmlForo.includes(`id=${pId}"`) || rawHtmlForo.includes(`userid":${pId}`) || rawHtmlForo.includes(`userid":"${pId}"`))) profeEncontrado = true;
-        let dForo = new DOMParser().parseFromString(rawHtmlForo,"text/html");
-        function escanearDoc(doc) {
+
+        function escanearParticipantes(doc) {
+            // Eliminar paneles laterales para evitar detectar enlaces secundarios
             doc.querySelectorAll('aside, nav, header, footer, #block-region-side-pre, #block-region-side-post, .block, .navbar').forEach(el => el.remove());
-            let main = doc.querySelector('#region-main, [role="main"], #maincontent, .course-content') || doc.body;
-            if(pId && main.innerHTML.includes(`id=${pId}`)) profeEncontrado = true;
-            doc.querySelectorAll('.forumpost, article.forum-post, tr.discussion, .discussion-list-item, td.author, a[href*="user/view.php"]').forEach(post => {
-                let html = post.innerHTML || "";
-                if (pId && html.includes(`id=${pId}`)) profeEncontrado = true;
-                let imgAutor = post.querySelector('img.userpicture');
-                let linkAutor = post.tagName.toLowerCase() === 'a' ? post : post.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
-                
-                if(imgAutor || linkAutor){
-                    let n = ((linkAutor ? linkAutor.textContent : "") || (imgAutor ? imgAutor.getAttribute('alt') : "") || "").replace(/Imagen de /gi, "").trim();
-                    if(n.length > 3 && !n.toLowerCase().includes('profesor') && !n.toLowerCase().includes('docente')) estudiantes.add(n);
+            
+            // Inspeccionar las publicaciones e hilos de discusión en el cuerpo del foro
+            doc.querySelectorAll('.forumpost, article.forum-post, tr.discussion, .discussion-list-item').forEach(post => {
+                let autorLink = post.querySelector('.author a[href*="user/view.php"], .author a[href*="user/profile.php"], td.author a[href*="user/view.php"], a[href*="user/view.php"]');
+                if (autorLink) {
+                    let hrefAutor = autorLink.href || "";
+                    if (pId && (hrefAutor.includes(`id=${pId}&`) || hrefAutor.endsWith(`id=${pId}`))) {
+                        profeEncontrado = true;
+                    } else {
+                        let n = autorLink.textContent.replace(/\s+/g, ' ').trim();
+                        if (n.length > 3 && !n.toLowerCase().includes('profesor') && !n.toLowerCase().includes('docente')) {
+                            estudiantes.add(n);
+                        }
+                    }
                 }
             });
         }
-        escanearDoc(dForo);
+
+        escanearParticipantes(dForo);
+
+        // Si no se encuentra al docente en la página principal, buscar dentro de cada tema/debate
         if(!profeEncontrado) {
             let linksDebates = Array.from(dForo.querySelectorAll('a[href*="discuss.php?d="]')).map(a => a.href.split('#')[0]);
-            let linksUnicos = [...new Set(linksDebates)].slice(0, 8); 
+            let linksUnicos = [...new Set(linksDebates)].slice(0, 6); 
             for(let link of linksUnicos) {
                 if(profeEncontrado) break; 
                 try {
-                    let rDeb = await fetch(link);
+                    let rDeb = await fetchSeguro(link);
                     if(!rDeb.ok) continue;
                     let textDeb = await rDeb.text();
-                    if (pId && (textDeb.includes(`id=${pId}`) || textDeb.includes(`userid":${pId}`) || textDeb.includes(`userid":"${pId}"`))) {
-                        profeEncontrado = true; break;
-                    }
                     let docDeb = new DOMParser().parseFromString(textDeb, "text/html");
-                    escanearDoc(docDeb);
+                    escanearParticipantes(docDeb);
+                    await esperar(250); // Pausa leve de seguridad por cada consulta profunda
                 } catch(e){}
             }
         }
+
         if(profeEncontrado) return `<span style='color:#27ae60;font-weight:bold;'>✅ Sí</span>${linkDebug}`;
         
         let arrEstudiantes = Array.from(estudiantes);
