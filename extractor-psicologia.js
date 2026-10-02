@@ -1,6 +1,6 @@
 (async function(){
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
-const ids=[55853, 55901, 55933, 55854, 55902, 55934, 55855, 55903, 55935, 55856, 55904, 55936, 55857, 55905, 55937, 55858, 55906, 55938, 55980, 55859, 55907, 55939, 55960, 55981, 55860, 55908, 55940, 55961, 55982, 55861, 55909, 55941, 55962, 55983, 55862, 55910, 55942, 55963, 55984, 55863, 55864, 55865, 55866, 55867, 55868, 55911, 55943, 55985, 55869, 55912, 55944, 55965, 55986, 55870, 55913, 55945, 55966, 55987, 55871, 55914, 55946, 55988, 55872, 55915, 55947, 55989, 55873, 55916, 55874, 55917, 55875, 55918, 55876, 55919, 55877, 55920, 55878, 55921, 55948, 55969, 55879, 55922, 55949, 55970, 55880, 55923, 55950, 55971, 55881, 55924, 55951, 55972, 55882, 55925, 55952, 55973, 55883, 55884, 56226, 55885, 55886, 55887, 55888, 55926, 55953, 55974, 55889, 55927, 55954, 55975, 55890, 55928, 55955, 55976, 55891, 55929, 55956, 55977, 55892, 55930, 55957, 55978, 55893, 55894, 55895, 55896, 55897];
+const ids=[55853, 55901, 55933, 55854, 55902, 55934, 55855, 55903, 55935, 55856, 55904, 55936, 55857, 55905, 55937, 55858, 55930, 55957, 55978, 55893, 55894, 55895, 55896, 55897];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
 // 🛑 RESGUARDO DE RED: Función para pausar la ejecución de peticiones
 const esperar = ms => new Promise(res => setTimeout(res, ms));
@@ -22,6 +22,46 @@ async function fetchSeguro(url, maxReintentos = 3) {
     }
     return { ok: false };
 }
+
+// NUEVA FUNCIÓN: Modal para estudiantes con inactividad >= 15 días
+window.mostrarEstudiantesInactivos = function(datosCodificados) {
+    let data = JSON.parse(decodeURIComponent(datosCodificados));
+    let modalPrev = document.getElementById('modal-estudiantes-inactivos');
+    if (modalPrev) modalPrev.remove();
+    
+    let listaHtml = data.estudiantes.map(e => {
+        let asunto = encodeURIComponent(`Revisión de situación académica - ${data.curso}`);
+        let cuerpo = encodeURIComponent(`Estimado/a ${e.nombre},\n\nJunto con saludar, nos comunicamos con usted debido a que hemos detectado que no ha ingresado a la plataforma en 15 o más días en el curso "${data.curso}".\n\nPor lo mismo, queremos saber si necesita algún tipo de ayuda o desea revisar su situación con la escuela para que pueda continuar con su proceso académico.\n\nQuedamos atentos a sus comentarios.\n\nSaludos cordiales.`);
+        let mailto = `mailto:${e.correo}?subject=${asunto}&body=${cuerpo}`;
+        
+        return `<li style="margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <div style="font-weight:bold; color:#2c3e50;">👤 ${e.nombre}</div>
+                <div style="font-size:11px; color:#7f8c8d;">Último acceso: ${e.acceso} | ✉️ ${e.correo}</div>
+            </div>
+            <a href="${mailto}" target="_blank" style="background:#2980b9; color:white; padding:6px 10px; border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold; text-align:center;">📧 Enviar Correo</a>
+        </li>`;
+    }).join('');
+    
+    let div = document.createElement('div');
+    div.id = "modal-estudiantes-inactivos";
+    div.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:100000;display:flex;justify-content:center;align-items:center;";
+    div.innerHTML = `
+        <div style="background:white;padding:25px;border-radius:10px;width:550px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,0.3);font-family:sans-serif;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <h3 style="margin:0;color:#c0392b;">🚨 Estudiantes inactivos (15+ días)</h3>
+                <button onclick="document.getElementById('modal-estudiantes-inactivos').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#7f8c8d;font-weight:bold;">&times;</button>
+            </div>
+            <div style="margin-bottom:10px; font-size:13px; color:#555;"><b>Curso:</b> ${data.curso}</div>
+            <div style="overflow-y:auto;flex-grow:1;border:1px solid #ecf0f1;padding:10px;border-radius:6px;background:#f9fbfc;">
+                <ul style="list-style:none;padding:0;margin:0;font-size:13px;color:#2c3e50;">${listaHtml}</ul>
+            </div>
+            <button onclick="document.getElementById('modal-estudiantes-inactivos').remove()" style="margin-top:15px;padding:10px;background:#34495e;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">Cerrar Ventana</button>
+        </div>
+    `;
+    document.body.appendChild(div);
+};
+
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
     let estudiantes = decodeURIComponent(datosCodificados).split('||');
     let listaHtml = estudiantes.map(e => `<li style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">👤 ${e}</li>`).join('');
@@ -430,6 +470,8 @@ async function ejecutarExtractor(estudianteObjetivo){
             let linkAsignatura = `<a href="https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}" target="_blank" style="color:#2980b9; text-decoration:none;">${nombreCurso}</a>`;
             
             let pNombre="No asignado",pCorreo="No disponible",pAcceso="Nunca ha ingresado",pId=null;
+            let inactivos15Dias = []; // Arreglo para almacenar estudiantes inactivos >= 15 días
+            
             let rProf = await fetchSeguro(`https://e-campus.uniacc.cl/user/index.php?id=${ids[i]}&perpage=5000`);
             if(rProf.ok){
                 let dProf=new DOMParser().parseFromString(await rProf.text(),"text/html");
@@ -443,8 +485,13 @@ async function ejecutarExtractor(estudianteObjetivo){
                 let filasParticipantes=dProf.querySelectorAll('#participants tbody tr, .userlist table tbody tr');
                 for(let row of filasParticipantes){
                     let textoFila=(row.textContent||"").toLowerCase();
-                    if(textoFila.includes("profesor")||textoFila.includes("docente")||textoFila.includes("tutor")){
-                        let linkNombre=row.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
+                    let esProfesor = textoFila.includes("profesor")||textoFila.includes("docente")||textoFila.includes("tutor");
+                    let linkNombre=row.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
+                    let matchCorreo=row.innerHTML.match(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/);
+                    let celdaAcceso=(idxAcceso!==-1&&row.cells[idxAcceso])?row.cells[idxAcceso]:row.querySelector('.column-lastaccess');
+                    let txtAcceso = celdaAcceso ? (celdaAcceso.textContent||"").trim() : "";
+                    
+                    if(esProfesor){
                         if(linkNombre){
                             if(pId===null){
                                 let matchId=linkNombre.href.match(/id=(\d+)/);
@@ -456,10 +503,34 @@ async function ejecutarExtractor(estudianteObjetivo){
                                 if(rawName.toLowerCase().startsWith("bp") && rawName.length > 5) { rawName = rawName.substring(2).trim(); }
                                 pNombre = rawName;
                                 
-                                let matchCorreo=row.innerHTML.match(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/);
                                 if(matchCorreo)pCorreo=matchCorreo[0];
-                                let celdaAcceso=(idxAcceso!==-1&&row.cells[idxAcceso])?row.cells[idxAcceso]:row.querySelector('.column-lastaccess');
-                                if(celdaAcceso&&(celdaAcceso.textContent||"").trim()!=="") pAcceso=(celdaAcceso.textContent||"").trim();
+                                if(txtAcceso!=="") pAcceso=txtAcceso;
+                            }
+                        }
+                    } else {
+                        // Extracción de inactividad de estudiantes
+                        if(linkNombre && matchCorreo && txtAcceso){
+                            let clonL = linkNombre.cloneNode(true);
+                            clonL.querySelectorAll('.userinitials, .initials, .sr-only, .accesshide').forEach(el => el.remove());
+                            let nombreEstudiante = (clonL.textContent||"").replace(/\s+/g,' ').trim();
+                            let correoEstudiante = matchCorreo[0];
+                            
+                            let accMin = txtAcceso.toLowerCase();
+                            let inactivo15 = false;
+                            
+                            if (/nunca|mes|año/.test(accMin)) {
+                                inactivo15 = true;
+                            } else if (/(día|dia)/.test(accMin)) {
+                                let numDias = parseInt(accMin.match(/\d+/)?.[0] || 0);
+                                if (numDias >= 15) inactivo15 = true;
+                            }
+                            
+                            if(inactivo15) {
+                                inactivos15Dias.push({
+                                    nombre: nombreEstudiante,
+                                    correo: correoEstudiante,
+                                    acceso: txtAcceso
+                                });
                             }
                         }
                     }
@@ -560,7 +631,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                         colValidas.push({idx:idx,nom:nom,urlDirecta:linkActividad?linkActividad.href:null, actId: actId});
                     }
                 });
-
                 // 🎯 REGLA DE EXCLUSIÓN: Si existen evaluaciones no formativas (sumativas, controles, exámene, etc.), se descartan las formativas.
                 let tieneOtrasEvaluaciones = colValidas.some(col => !/formativ/i.test(normalizarTexto(col.nom)));
                 if (tieneOtrasEvaluaciones) {
@@ -582,7 +652,6 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let fechaAperturaEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].apertura : null;
                             let fIniTexto = fechaAperturaEsp || (arregloUnidades[unidadAsignada - 1] ? arregloUnidades[unidadAsignada - 1].inicio : null);
                             let fInicioObj = parsearFechaMoodle(fIniTexto);
-
                             let statusForo="No aplica";
                             if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso, fInicioObj);
                             
@@ -626,10 +695,8 @@ async function ejecutarExtractor(estudianteObjetivo){
                             
                             let fIniTexto = fechaAperturaEsp || (arregloUnidades[unidadAsignada - 1] ? arregloUnidades[unidadAsignada - 1].inicio : null);
                             let fInicioObj = parsearFechaMoodle(fIniTexto);
-
                             let statusForo="No aplica";
                             if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso, fInicioObj);
-
                             let fechasStr = "No especificada";
                             let textoTermino = "Cierre del curso";
                             let fLimite = null;
@@ -717,6 +784,13 @@ async function ejecutarExtractor(estudianteObjetivo){
                         
                         let enc = s => encodeURIComponent(s).replace(/'/g, "%27");
                         let safeCorreo = enc(pCorreo);
+                        
+                        if(inactivos15Dias.length > 0) {
+                            let dataCodificada = encodeURIComponent(JSON.stringify({curso: nombreCurso, estudiantes: inactivos15Dias})).replace(/'/g, "%27");
+                            arrayBotones.push(`<button onclick="window.mostrarEstudiantesInactivos('${dataCodificada}')" style="display:inline-block;width:100px;padding:6px;background:#c0392b;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">📉 ${inactivos15Dias.length} Inactivos</button>`);
+                            arrayBotones.push(`<div style="height:4px; border-bottom:1px dashed #ccc; margin-bottom:4px;"></div>`);
+                        }
+
                         if(listaPendientesMaestra.length > 0 && pCorreo.includes('@')) {
                             let subjTodo = enc(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
                             let intro = enc(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}`);
@@ -895,11 +969,9 @@ async function ejecutarExtractor(estudianteObjetivo){
     
     renderTabla();
 }
-
 // 🎯 REVISIÓN DE FOROS PRECISA Y ROBUSTA
 async function verificarEstadoForo(col, idCurso, pNombre, pId, dCursoPreload, fInicioObj) {
     let aunNoInicia = fInicioObj && (new Date() < fInicioObj);
-
     let urlForoObjetivo = col.urlDirecta && (col.urlDirecta.includes("mod/forum/view.php") || col.urlDirecta.includes("mod/forum/discuss.php")) ? col.urlDirecta : null;
     
     if (!urlForoObjetivo || !urlForoObjetivo.includes("forum")) {
@@ -940,7 +1012,6 @@ async function verificarEstadoForo(col, idCurso, pNombre, pId, dCursoPreload, fI
             ? "<span style='color:#f39c12;font-weight:bold;'>🟡 Aún no inicia</span>" 
             : "<span style='color:#c0392b;font-weight:bold;'>❌ No hay foro</span>";
     }
-
     let linkDebug = `<br><a href="${urlForoObjetivo}" target="_blank" style="font-size:10px;color:#3498db;text-decoration:none;">🔗 Ver foro</a>`;
     
     try {
@@ -954,7 +1025,6 @@ async function verificarEstadoForo(col, idCurso, pNombre, pId, dCursoPreload, fI
         let dForo = new DOMParser().parseFromString(await rForo.text(), "text/html");
         let profeEncontrado = false;
         let estudiantes = new Set();
-
         function analizarContenidoForo(doc) {
             let areaPrincipal = doc.querySelector('#region-main, #content, .main-content, #page-content') || doc.body;
             let userLinks = areaPrincipal.querySelectorAll('a[href*="user/view.php"], a[href*="user/profile.php"]');
@@ -977,9 +1047,7 @@ async function verificarEstadoForo(col, idCurso, pNombre, pId, dCursoPreload, fI
                 }
             });
         }
-
         analizarContenidoForo(dForo);
-
         let areaMain = dForo.querySelector('#region-main, #content, .main-content, #page-content') || dForo.body;
         let linksDebates = Array.from(areaMain.querySelectorAll('a[href*="discuss.php?d="]')).map(a => a.href.split('#')[0]);
         let linksUnicos = [...new Set(linksDebates)].slice(0, 6);
@@ -993,13 +1061,11 @@ async function verificarEstadoForo(col, idCurso, pNombre, pId, dCursoPreload, fI
                 await esperar(250);
             } catch(e) {}
         }
-
         if (profeEncontrado) return `<span style='color:#27ae60;font-weight:bold;'>✅ Sí</span>${linkDebug}`;
         
         if (aunNoInicia) {
             return `<span style='color:#f39c12;font-weight:bold;'>🟡 Aún no inicia</span>${linkDebug}`;
         }
-
         let arrEstudiantes = Array.from(estudiantes);
         if (arrEstudiantes.length === 0) {
             return `<span style='color:#c0392b;font-weight:bold;'>❌ No hay foro</span><br><small style='font-size:10px;color:#888;'>Sin discusiones</small>${linkDebug}`;
