@@ -2,7 +2,65 @@
 /* 👇 TODOS TUS IDs CARGADOS 👇 */
 const ids=[56087, 56101, 55189, 55203, 55215, 55221, 56088, 56102, 56111, 55190, 55341, 56089, 56103, 55191, 55204, 55192, 55205, 55216, 55222, 55343, 56090, 56104, 55193, 55206, 56091, 55194, 55207, 56092, 55195, 56093, 55196, 55208, 55217, 56094, 56105, 55197, 55209, 56095, 56195, 55198, 55210, 55218, 55344, 56096, 56106, 56112, 56114, 56097, 56107, 55199, 55211, 55219, 55223, 55345, 56098, 56108, 56113, 55200, 55212, 55346, 56099, 56109, 55201, 55213, 56048, 56051, 56054, 56062, 56221, 56067, 56070, 56194, 56100, 56110, 55202, 55214, 55220, 55224, 55226, 55227, 55228, 55229, 55230, 55231, 55232, 55233, 55234, 55235, 55236, 55237, 55238, 55348, 55349, 55350, 55351, 56049, 56052, 56055, 56057, 56063, 56065, 56068, 56071, 56073, 56075, 56077];
 const coloresPastel=['#ffffff', '#fcfcfc']; 
+// 🛑 RESGUARDO DE RED: Función para pausar la ejecución de peticiones
 const esperar = ms => new Promise(res => setTimeout(res, ms));
+// 🛑 RESGUARDO DE SISTEMA: Fetch con protección contra caídas de red, tiempo límite y control de tasa
+async function fetchSeguro(url, maxReintentos = 3) {
+    for (let i = 0; i < maxReintentos; i++) {
+        try {
+            let controller = new AbortController();
+            let timeout = setTimeout(() => controller.abort(), 12000); // Límite de tiempo por consulta (12s)
+            let r = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeout);
+            
+            if (r.ok) return r;
+            if (r.status === 429) await esperar(3000); // Pausa larga si la plataforma reporta sobrecarga
+        } catch (error) {
+            if (i === maxReintentos - 1) return { ok: false, statusText: "Error de red" };
+            await esperar(600 * (i + 1)); // Reintento progresivo
+        }
+    }
+    return { ok: false };
+}
+
+// NUEVA FUNCIÓN: Modal para estudiantes con inactividad >= 15 días
+window.mostrarEstudiantesInactivos = function(datosCodificados) {
+    let data = JSON.parse(decodeURIComponent(datosCodificados));
+    let modalPrev = document.getElementById('modal-estudiantes-inactivos');
+    if (modalPrev) modalPrev.remove();
+    
+    let listaHtml = data.estudiantes.map(e => {
+        let asunto = encodeURIComponent(`Revisión de situación académica - ${data.curso}`);
+        let cuerpo = encodeURIComponent(`Estimado/a ${e.nombre},\n\nJunto con saludar, nos comunicamos con usted debido a que hemos detectado que no ha ingresado a la plataforma en 15 o más días en el curso "${data.curso}".\n\nPor lo mismo, queremos saber si necesita algún tipo de ayuda o desea revisar su situación con la escuela para que pueda continuar con su proceso académico.\n\nQuedamos atentos a sus comentarios.\n\nSaludos cordiales.`);
+        let mailto = `mailto:${e.correo}?subject=${asunto}&body=${cuerpo}`;
+        
+        return `<li style="margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <div style="font-weight:bold; color:#2c3e50;">👤 ${e.nombre}</div>
+                <div style="font-size:11px; color:#7f8c8d;">Último acceso: ${e.acceso} | ✉️ ${e.correo}</div>
+            </div>
+            <a href="${mailto}" target="_blank" style="background:#2980b9; color:white; padding:6px 10px; border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold; text-align:center;">📧 Enviar Correo</a>
+        </li>`;
+    }).join('');
+    
+    let div = document.createElement('div');
+    div.id = "modal-estudiantes-inactivos";
+    div.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:100000;display:flex;justify-content:center;align-items:center;";
+    div.innerHTML = `
+        <div style="background:white;padding:25px;border-radius:10px;width:550px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,0.3);font-family:sans-serif;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <h3 style="margin:0;color:#c0392b;">🚨 Estudiantes inactivos (15+ días)</h3>
+                <button onclick="document.getElementById('modal-estudiantes-inactivos').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#7f8c8d;font-weight:bold;">&times;</button>
+            </div>
+            <div style="margin-bottom:10px; font-size:13px; color:#555;"><b>Curso:</b> ${data.curso}</div>
+            <div style="overflow-y:auto;flex-grow:1;border:1px solid #ecf0f1;padding:10px;border-radius:6px;background:#f9fbfc;">
+                <ul style="list-style:none;padding:0;margin:0;font-size:13px;color:#2c3e50;">${listaHtml}</ul>
+            </div>
+            <button onclick="document.getElementById('modal-estudiantes-inactivos').remove()" style="margin-top:15px;padding:10px;background:#34495e;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">Cerrar Ventana</button>
+        </div>
+    `;
+    document.body.appendChild(div);
+};
 
 window.mostrarEstudiantesSinNota = function(datosCodificados) {
     let estudiantes = decodeURIComponent(datosCodificados).split('||');
@@ -24,7 +82,6 @@ window.mostrarEstudiantesSinNota = function(datosCodificados) {
     `;
     document.body.appendChild(div);
 };
-
 window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
     let modalPrev = document.getElementById('modal-dashboard');
     if (modalPrev) modalPrev.remove();
@@ -127,7 +184,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
         let score = totalNotas + (totalForos * 5) + (d.esInactivo ? 10 : 0);
         return { ...d, totalNotas, totalForos, score };
     }).sort((a, b) => b.score - a.score);
-
     let htmlCiclos = Object.keys(ciclosMap).map(cicloKey => {
         let cData = ciclosMap[cicloKey];
         if (cData.total === 0) return ''; 
@@ -150,7 +206,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
             </div>
         `;
     }).join('');
-
     let htmlDocentesAtrasados = docentesAtrasadosArr.length > 0 ? docentesAtrasadosArr.map(doc => {
         let detallesCursos = doc.cursos.map(c => {
             let evalsText = c.evaluaciones.length > 0 ? `<br><small style="color:#e67e22;">• ${c.evaluaciones.join(', ')}</small>` : '';
@@ -167,7 +222,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
             </tr>
         `;
     }).join('') : `<tr><td colspan="5" style="text-align:center; padding:20px; color:#27ae60; font-weight:bold;">🎉 ¡Sin alertas! Todos los docentes están al día.</td></tr>`;
-
     let modalDiv = document.createElement('div');
     modalDiv.id = "modal-dashboard";
     modalDiv.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:100000; display:flex; justify-content:center; align-items:center; font-family:sans-serif;";
@@ -254,7 +308,6 @@ window.mostrarDashboardModal = function(datosExtraidos, esBusquedaEstudiante) {
     `;
     document.body.appendChild(modalDiv);
 };
-
 window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, explicacionCod, despedidaCod) {
     let asunto = decodeURIComponent(asuntoCod);
     let cuerpoTexto = decodeURIComponent(introCod) + decodeURIComponent(detallesCod) + decodeURIComponent(explicacionCod) + decodeURIComponent(despedidaCod);
@@ -269,18 +322,15 @@ window.enviarCorreoSeguro = function(correo, asuntoCod, introCod, detallesCod, e
         console.log("Contenido copiado al portapapeles.");
     }).catch(()=>{});
 };
-
 function normalizarTexto(t){
     return t?t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim():"";
 }
-
 function generarNombreCorto(nom, unidad) {
     let n = nom.toLowerCase();
     if(n.includes("formativa")) return `Act. Formativa U${unidad}`;
     if(n.includes("sumativa")) return `Act. Sumativa U${unidad}`;
     return nom.length > 35 ? nom.substring(0,32) + "..." : nom;
 }
-
 function parsearFechaMoodle(texto) {
     if (!texto || /cierre del curso/i.test(texto)) return null;
     let t = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -295,16 +345,12 @@ function parsearFechaMoodle(texto) {
     let anio = matchAnio ? parseInt(matchAnio[1]) : new Date().getFullYear();
     return new Date(anio, mesIdx, dia);
 }
-
 function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFechas) {
     let nom = normalizarTexto(nombreCurso);
-    
     if (/\b(semestral|semestre|taller|practica|práctica|seminario|tesis|memoria|20\s*semanas)\b/i.test(nom)) {
         return "Semestral";
     }
-    
     let fechasClave = [];
-    
     if (arregloUnidades && arregloUnidades.length > 0) {
         arregloUnidades.forEach(u => {
             let fIni = parsearFechaMoodle(u.inicio);
@@ -313,7 +359,6 @@ function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFe
             if (fFin) fechasClave.push(fFin);
         });
     }
-    
     if (mapaActividadFechas) {
         Object.values(mapaActividadFechas).forEach(fObj => {
             if (fObj.apertura) {
@@ -326,35 +371,23 @@ function determinarCicloAsignatura(nombreCurso, arregloUnidades, mapaActividadFe
             }
         });
     }
-    
     if (fechasClave.length >= 2) {
         fechasClave.sort((a, b) => a - b);
         let primeraFecha = fechasClave[0];
         let ultimaFecha = fechasClave[fechasClave.length - 1];
-        
         let mesInicio = primeraFecha.getMonth(); 
         let mesFin = ultimaFecha.getMonth();     
-        
-        if ((mesInicio === 7 || mesInicio === 8) && (mesFin === 0 || mesFin === 1)) {
-            return "Semestral";
-        }
-        if (mesInicio === 7 || mesInicio === 8) {
-            return "1er Ciclo";
-        }
-        if (mesInicio === 10 || mesInicio === 11 || mesInicio === 0) {
-            return "2do Ciclo";
-        }
+        if ((mesInicio === 7 || mesInicio === 8) && (mesFin === 0 || mesFin === 1)) return "Semestral";
+        if (mesInicio === 7 || mesInicio === 8) return "1er Ciclo";
+        if (mesInicio === 10 || mesInicio === 11 || mesInicio === 0) return "2do Ciclo";
     }
-    
     if (fechasClave.length > 0) {
         let mesInicio = fechasClave[0].getMonth(); 
         if (mesInicio === 7 || mesInicio === 8) return "1er Ciclo";
         if (mesInicio >= 10 || mesInicio === 0) return "2do Ciclo";
     }
-    
     return "1er Ciclo";
 }
-
 function obtenerNumeroUnidad(nombreColumna) {
     let texto = normalizarTexto(nombreColumna);
     let numeros = texto.match(/\d+/g);
@@ -367,7 +400,6 @@ function obtenerNumeroUnidad(nombreColumna) {
     if (/\bi\b/.test(texto)) return 1;
     return null;
 }
-
 function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
     if (actId && mapaActividadUnidad[actId] && mapaActividadUnidad[actId] <= totalUnidades) {
         return mapaActividadUnidad[actId];
@@ -377,17 +409,13 @@ function asignarUnidad(nom, idxCol, totalUnidades, actId, mapaActividadUnidad) {
     if (numNombre !== null && numNombre <= totalUnidades && numNombre > 0) return numNombre;
     return (idxCol !== -1 && idxCol < totalUnidades) ? idxCol + 1 : (totalUnidades || 1);
 }
-
 function obtenerColorRendimiento(pct, fLimite) {
     let ahora = new Date();
-    if (fLimite && ahora < fLimite) {
-        return pct >= 90 ? '#e8f8f5' : '#ffffff'; 
-    }
+    if (fLimite && ahora < fLimite) return pct >= 90 ? '#e8f8f5' : '#ffffff'; 
     if (pct < 50) return '#fadbd8';  
     if (pct < 90) return '#fdebd0';  
     return '#e8f8f5';               
 }
-
 function configurarColorAcceso(pAcceso) {
     let txt = pAcceso.toLowerCase();
     if (/nunca|mes|año/i.test(txt)) return '#c0392b'; 
@@ -399,9 +427,8 @@ function configurarColorAcceso(pAcceso) {
     }
     return '#27ae60'; 
 }
-
 function iniciarPanelUI(){
-    document.body.innerHTML=`<div id="panel-auditoria" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(245,247,250,0.98);z-index:9999;display:flex;justify-content:center;align-items:center;font-family:sans-serif;overflow-y:auto;"><div style="background:white;padding:35px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1);text-align:center;width:480px;border:1px solid #e1e8ed;max-height:95vh;overflow-y:auto;"><h2 style="background:linear-gradient(135deg,#cc609b,#ff89c9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;color:#cc609b;margin:0 0 10px 0;font-size:26px;font-weight:bold;letter-spacing:-0.5px;">Revisor eCampus (Formación General)</h2><p style="color:#555;font-size:15px;margin:0 0 20px 0;font-weight:bold;">¿Qué deseas hacer?</p><button id="btnGeneral" style="width:100%;background:#27ae60;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;margin-bottom:20px;transition:0.2s;">🚀 Revisión General de Asignaturas</button><div style="border-top:2px dashed #e1e8ed;margin:20px 0;"></div><h3 style="color:#7f8c8d;font-size:14px;margin-bottom:12px;text-align:left;font-weight:bold;">🔍 Búsqueda Rápida por Estudiante:</h3><input type="email" id="correoEstudiante" placeholder="Correo exacto del estudiante" style="width:100%;padding:11px;box-sizing:border-box;border:2px solid #bdc3c7;border-radius:8px;font-size:13px;margin-bottom:15px;outline:none;"><button id="btnEstudiante" style="width:100%;background:#2980b9;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;transition:0.2s;">👤 Buscar en Todas las Aulas</button></div></div>`;
+    document.body.innerHTML=`<div id="panel-auditoria" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(245,247,250,0.98);z-index:9999;display:flex;justify-content:center;align-items:center;font-family:sans-serif;overflow-y:auto;"><div style="background:white;padding:35px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1);text-align:center;width:480px;border:1px solid #e1e8ed;max-height:95vh;overflow-y:auto;"><h2 style="background:linear-gradient(135deg,#cc609b,#ff89c9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;color:#cc609b;margin:0 0 10px 0;font-size:26px;font-weight:bold;letter-spacing:-0.5px;">Revisor eCampus (Escuela de Psicología)</h2><p style="color:#555;font-size:15px;margin:0 0 20px 0;font-weight:bold;">¿Qué deseas hacer?</p><button id="btnGeneral" style="width:100%;background:#27ae60;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;margin-bottom:20px;transition:0.2s;">🚀 Revisión General de Asignaturas</button><div style="border-top:2px dashed #e1e8ed;margin:20px 0;"></div><h3 style="color:#7f8c8d;font-size:14px;margin-bottom:12px;text-align:left;font-weight:bold;">🔍 Búsqueda Rápida por Estudiante:</h3><input type="email" id="correoEstudiante" placeholder="Correo exacto del estudiante" style="width:100%;padding:11px;box-sizing:border-box;border:2px solid #bdc3c7;border-radius:8px;font-size:13px;margin-bottom:15px;outline:none;"><button id="btnEstudiante" style="width:100%;background:#2980b9;color:white;border:none;padding:14px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;transition:0.2s;">👤 Buscar en Todas las Aulas</button></div></div>`;
     document.getElementById('btnGeneral').addEventListener('click',()=>ejecutarExtractor(null));
     document.getElementById('btnEstudiante').addEventListener('click',()=>{
         let correo=document.getElementById('correoEstudiante').value.trim().toLowerCase();
@@ -409,7 +436,6 @@ function iniciarPanelUI(){
         ejecutarExtractor(correo);
     });
 }
-
 async function ejecutarExtractor(estudianteObjetivo){
     let esBusquedaEstudiante=estudianteObjetivo!==null;
     let datosExtraidos = [];
@@ -418,12 +444,13 @@ async function ejecutarExtractor(estudianteObjetivo){
     
     for(let i=0;i<ids.length;i++){
         try{
-            await esperar(150);
+            // 🛑 RESGUARDO: Pausa entre aulas para evitar congelamientos o caídas del servidor
+            await esperar(300);
             
-            let r=await fetch(`https://e-campus.uniacc.cl/grade/report/grader/index.php?id=${ids[i]}&perpage=5000&collapsed=0`);
+            let r = await fetchSeguro(`https://e-campus.uniacc.cl/grade/report/grader/index.php?id=${ids[i]}&perpage=5000&collapsed=0`);
             if(!r.ok) continue;
             
-            let textGrader=await r.text();
+            let textGrader = await r.text();
             if(textGrader.includes("login/index.php")) {
                 alert("⚠️ Su sesión de eCampus ha expirado. Por favor inicie sesión nuevamente.");
                 location.reload();
@@ -443,7 +470,9 @@ async function ejecutarExtractor(estudianteObjetivo){
             let linkAsignatura = `<a href="https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}" target="_blank" style="color:#2980b9; text-decoration:none;">${nombreCurso}</a>`;
             
             let pNombre="No asignado",pCorreo="No disponible",pAcceso="Nunca ha ingresado",pId=null;
-            let rProf=await fetch(`https://e-campus.uniacc.cl/user/index.php?id=${ids[i]}&perpage=5000`);
+            let inactivos15Dias = []; // Arreglo para almacenar estudiantes inactivos >= 15 días
+            
+            let rProf = await fetchSeguro(`https://e-campus.uniacc.cl/user/index.php?id=${ids[i]}&perpage=5000`);
             if(rProf.ok){
                 let dProf=new DOMParser().parseFromString(await rProf.text(),"text/html");
                 let idxAcceso=-1;
@@ -456,8 +485,13 @@ async function ejecutarExtractor(estudianteObjetivo){
                 let filasParticipantes=dProf.querySelectorAll('#participants tbody tr, .userlist table tbody tr');
                 for(let row of filasParticipantes){
                     let textoFila=(row.textContent||"").toLowerCase();
-                    if(textoFila.includes("profesor")||textoFila.includes("docente")||textoFila.includes("tutor")){
-                        let linkNombre=row.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
+                    let esProfesor = textoFila.includes("profesor")||textoFila.includes("docente")||textoFila.includes("tutor");
+                    let linkNombre=row.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
+                    let matchCorreo=row.innerHTML.match(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/);
+                    let celdaAcceso=(idxAcceso!==-1&&row.cells[idxAcceso])?row.cells[idxAcceso]:row.querySelector('.column-lastaccess');
+                    let txtAcceso = celdaAcceso ? (celdaAcceso.textContent||"").trim() : "";
+                    
+                    if(esProfesor){
                         if(linkNombre){
                             if(pId===null){
                                 let matchId=linkNombre.href.match(/id=(\d+)/);
@@ -469,16 +503,40 @@ async function ejecutarExtractor(estudianteObjetivo){
                                 if(rawName.toLowerCase().startsWith("bp") && rawName.length > 5) { rawName = rawName.substring(2).trim(); }
                                 pNombre = rawName;
                                 
-                                let matchCorreo=row.innerHTML.match(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/);
                                 if(matchCorreo)pCorreo=matchCorreo[0];
-                                let celdaAcceso=(idxAcceso!==-1&&row.cells[idxAcceso])?row.cells[idxAcceso]:row.querySelector('.column-lastaccess');
-                                if(celdaAcceso&&(celdaAcceso.textContent||"").trim()!=="") pAcceso=(celdaAcceso.textContent||"").trim();
+                                if(txtAcceso!=="") pAcceso=txtAcceso;
+                            }
+                        }
+                    } else {
+                        // Extracción de inactividad de estudiantes
+                        if(linkNombre && matchCorreo && txtAcceso){
+                            let clonL = linkNombre.cloneNode(true);
+                            clonL.querySelectorAll('.userinitials, .initials, .sr-only, .accesshide').forEach(el => el.remove());
+                            let nombreEstudiante = (clonL.textContent||"").replace(/\s+/g,' ').trim();
+                            let correoEstudiante = matchCorreo[0];
+                            
+                            let accMin = txtAcceso.toLowerCase();
+                            let inactivo15 = false;
+                            
+                            if (/nunca|mes|año/.test(accMin)) {
+                                inactivo15 = true;
+                            } else if (/(día|dia)/.test(accMin)) {
+                                let numDias = parseInt(accMin.match(/\d+/)?.[0] || 0);
+                                if (numDias >= 15) inactivo15 = true;
+                            }
+                            
+                            if(inactivo15) {
+                                inactivos15Dias.push({
+                                    nombre: nombreEstudiante,
+                                    correo: correoEstudiante,
+                                    acceso: txtAcceso
+                                });
                             }
                         }
                     }
                 }
             }
-            let rCurso = await fetch(`https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}`);
+            let rCurso = await fetchSeguro(`https://e-campus.uniacc.cl/course/view.php?id=${ids[i]}`);
             let dCurso = new DOMParser().parseFromString(rCurso.ok ? await rCurso.text() : "", "text/html");
             
             let fechasSecuenciales = [];
@@ -542,9 +600,8 @@ async function ejecutarExtractor(estudianteObjetivo){
                 let colValidas=[];
                 Array.from(filaMaestra.cells).forEach((celda,idx)=>{
                     let nom=(celda.textContent||"").replace(/Vista única|Ascendente|Descendente|Colapsar|Expandir columna/gi,'').trim().split('\n')[0];
-                    let nomNorm = normalizarTexto(nom); // Normaliza el texto sin acentos
+                    let nomNorm = normalizarTexto(nom);
                     
-                    // 🚨 FILTRADO RIGUROSO: Excluye cualquier evaluación diagnóstica, AD, tests iniciales y totales
                     let esExcluido = /total|promedio|\bad\b|diagnost|entrada|caracterizac|encuesta|asistencia|repetici|nota final|calificacion final/i.test(nomNorm);
                     let esEvaluacion = /foro|control|evaluaci|examen|sumativa|formativa|tarea|unidad|prueba|cuestionario|final|proyecto|integraci/i.test(nomNorm);
                     
@@ -574,6 +631,11 @@ async function ejecutarExtractor(estudianteObjetivo){
                         colValidas.push({idx:idx,nom:nom,urlDirecta:linkActividad?linkActividad.href:null, actId: actId});
                     }
                 });
+                // 🎯 REGLA DE EXCLUSIÓN: Si existen evaluaciones no formativas (sumativas, controles, exámene, etc.), se descartan las formativas.
+                let tieneOtrasEvaluaciones = colValidas.some(col => !/formativ/i.test(normalizarTexto(col.nom)));
+                if (tieneOtrasEvaluaciones) {
+                    colValidas = colValidas.filter(col => !/formativ/i.test(normalizarTexto(col.nom)));
+                }
                 
                 let filasDatos=d.querySelectorAll('table tbody tr');
                 
@@ -585,12 +647,15 @@ async function ejecutarExtractor(estudianteObjetivo){
                             let col=colValidas[indiceColumna];
                             let rawNota=filaEstudiante.cells[col.idx]?.textContent||"-";
                             let notaTexto=rawNota.replace(/Acciones de la celda|Análisis de calificaciones|Ver retroalimentación/gi,'').trim()||"-";
-                            let statusForo="No aplica";
-                            if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
                             
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
-                            let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
                             let fechaAperturaEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].apertura : null;
+                            let fIniTexto = fechaAperturaEsp || (arregloUnidades[unidadAsignada - 1] ? arregloUnidades[unidadAsignada - 1].inicio : null);
+                            let fInicioObj = parsearFechaMoodle(fIniTexto);
+                            let statusForo="No aplica";
+                            if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso, fInicioObj);
+                            
+                            let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
                             let fechaCierreEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].cierre : null;
                             let fechasStr = "No especificada";
                             if (fechaCierreEsp) {
@@ -623,13 +688,15 @@ async function ejecutarExtractor(estudianteObjetivo){
                             }
                         });
                         if(totalAlumnos>0){
-                            let statusForo="No aplica";
-                            if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso);
-                            
                             let unidadAsignada = asignarUnidad(col.nom, colValidas.indexOf(col), arregloUnidades.length, col.actId, mapaActividadUnidad);
                             let nombreCorto = generarNombreCorto(col.nom, unidadAsignada);
                             let fechaAperturaEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].apertura : null;
                             let fechaCierreEsp = col.actId && mapaActividadFechas[col.actId] ? mapaActividadFechas[col.actId].cierre : null;
+                            
+                            let fIniTexto = fechaAperturaEsp || (arregloUnidades[unidadAsignada - 1] ? arregloUnidades[unidadAsignada - 1].inicio : null);
+                            let fInicioObj = parsearFechaMoodle(fIniTexto);
+                            let statusForo="No aplica";
+                            if(/foro/i.test(col.nom)) statusForo=await verificarEstadoForo(col,ids[i],pNombre,pId, dCurso, fInicioObj);
                             let fechasStr = "No especificada";
                             let textoTermino = "Cierre del curso";
                             let fLimite = null;
@@ -650,10 +717,10 @@ async function ejecutarExtractor(estudianteObjetivo){
                                 let esExamenFinal = /final|proyecto|integraci|examen/i.test(col.nom);
                                 
                                 if ((totalUn === 4 || totalUn === 5) && (esUnidadFinal || esExamenFinal)) {
-                                    let fInicioObj = parsearFechaMoodle(uObj.inicio);
-                                    if (fInicioObj) {
+                                    let fInicioObjUnit = parsearFechaMoodle(uObj.inicio);
+                                    if (fInicioObjUnit) {
                                         let diasExtra = (totalUn === 4) ? 14 : 35;
-                                        fLimite = new Date(fInicioObj.getTime() + (diasExtra * 24 * 60 * 60 * 1000));
+                                        fLimite = new Date(fInicioObjUnit.getTime() + (diasExtra * 24 * 60 * 60 * 1000));
                                     }
                                 } else {
                                     let fTermino = parsearFechaMoodle(textoTermino);
@@ -717,6 +784,13 @@ async function ejecutarExtractor(estudianteObjetivo){
                         
                         let enc = s => encodeURIComponent(s).replace(/'/g, "%27");
                         let safeCorreo = enc(pCorreo);
+                        
+                        if(inactivos15Dias.length > 0) {
+                            let dataCodificada = encodeURIComponent(JSON.stringify({curso: nombreCurso, estudiantes: inactivos15Dias})).replace(/'/g, "%27");
+                            arrayBotones.push(`<button onclick="window.mostrarEstudiantesInactivos('${dataCodificada}')" style="display:inline-block;width:100px;padding:6px;background:#c0392b;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;cursor:pointer;">📉 ${inactivos15Dias.length} Inactivos</button>`);
+                            arrayBotones.push(`<div style="height:4px; border-bottom:1px dashed #ccc; margin-bottom:4px;"></div>`);
+                        }
+
                         if(listaPendientesMaestra.length > 0 && pCorreo.includes('@')) {
                             let subjTodo = enc(`Recordatorio de Pendientes Urgentes - ${nombreCurso}`);
                             let intro = enc(`Estimado/a ${pNombre},\n\nJunto con saludar, le escribo para comunicarle que la plataforma registra las siguientes actividades pendientes por regularizar en la asignatura ${nombreCurso}:\n\n${listaPendientesMaestra.join('\n')}`);
@@ -765,7 +839,7 @@ async function ejecutarExtractor(estudianteObjetivo){
     }
     let cabeceraSuperior = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid ${esBusquedaEstudiante?'#2980b9':'#27ae60'}; padding-bottom:10px;">
-        <h2 style='color:${esBusquedaEstudiante?'#2980b9':'#27ae60'}; margin:0;'>${esBusquedaEstudiante?'👤 Historial: '+estudianteObjetivo:'✅ Auditoría Consolidada (Blindada)'}</h2>
+        <h2 style='color:${esBusquedaEstudiante?'#2980b9':'#27ae60'}; margin:0;'>${esBusquedaEstudiante?'👤 Historial: '+estudianteObjetivo:'✅ Resultados de la revisión'}</h2>
         <div>
             <button id="btnDashboard" style="padding:10px 15px; background:#8e44ad; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-right:10px; transition:0.2s;">📊 Dashboard</button>
             <button id="btnExportar" style="padding:10px 15px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-right:10px; transition:0.2s;">📥 Exportar Excel</button>
@@ -895,11 +969,13 @@ async function ejecutarExtractor(estudianteObjetivo){
     
     renderTabla();
 }
-
-async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
-    let urlForoObjetivo=col.urlDirecta&&(col.urlDirecta.includes("mod/forum/view.php")||col.urlDirecta.includes("mod/forum/discuss.php"))?col.urlDirecta:null;
-    if(!urlForoObjetivo || !urlForoObjetivo.includes("forum")){
-        try{
+// 🎯 REVISIÓN DE FOROS PRECISA Y ROBUSTA
+async function verificarEstadoForo(col, idCurso, pNombre, pId, dCursoPreload, fInicioObj) {
+    let aunNoInicia = fInicioObj && (new Date() < fInicioObj);
+    let urlForoObjetivo = col.urlDirecta && (col.urlDirecta.includes("mod/forum/view.php") || col.urlDirecta.includes("mod/forum/discuss.php")) ? col.urlDirecta : null;
+    
+    if (!urlForoObjetivo || !urlForoObjetivo.includes("forum")) {
+        try {
             let numsCol = normalizarTexto(col.nom).match(/\d+/g) || [];
             let dCurso = dCursoPreload; 
             let secciones = dCurso.querySelectorAll('#accordionEx1 > .card, .course-content .section');
@@ -928,64 +1004,82 @@ async function verificarEstadoForo(col,idCurso,pNombre,pId, dCursoPreload){
             let mejorCandidato = forosCandidatos.find(f => f.esSalaDeClases);
             if (mejorCandidato) urlForoObjetivo = mejorCandidato.href;
             else if (forosCandidatos.length > 0) urlForoObjetivo = forosCandidatos[0].href;
-        }catch(e){console.error("Error al rastrear unidad", e)}
+        } catch(e) { console.error("Error al rastrear unidad", e); }
     }
     
-    if(!urlForoObjetivo) return "<span style='color:#d35400;'>⚠️ No link</span>";
+    if (!urlForoObjetivo) {
+        return aunNoInicia 
+            ? "<span style='color:#f39c12;font-weight:bold;'>🟡 Aún no inicia</span>" 
+            : "<span style='color:#c0392b;font-weight:bold;'>❌ No hay foro</span>";
+    }
     let linkDebug = `<br><a href="${urlForoObjetivo}" target="_blank" style="font-size:10px;color:#3498db;text-decoration:none;">🔗 Ver foro</a>`;
-    try{
-        let rForo=await fetch(urlForoObjetivo);
-        if(!rForo.ok) return "<span style='color:#7f8c8d;'>⚠️ Error</span>";
-        let rawHtmlForo = await rForo.text();
+    
+    try {
+        let rForo = await fetchSeguro(urlForoObjetivo);
+        if (!rForo.ok) {
+            return aunNoInicia 
+                ? `<span style='color:#f39c12;font-weight:bold;'>🟡 Aún no inicia</span>${linkDebug}` 
+                : "<span style='color:#7f8c8d;'>⚠️ Error</span>";
+        }
+        
+        let dForo = new DOMParser().parseFromString(await rForo.text(), "text/html");
         let profeEncontrado = false;
         let estudiantes = new Set();
-        if (pId && (rawHtmlForo.includes(`id=${pId}&`) || rawHtmlForo.includes(`id=${pId}"`) || rawHtmlForo.includes(`userid":${pId}`) || rawHtmlForo.includes(`userid":"${pId}"`))) profeEncontrado = true;
-        let dForo = new DOMParser().parseFromString(rawHtmlForo,"text/html");
-        function escanearDoc(doc) {
-            doc.querySelectorAll('aside, nav, header, footer, #block-region-side-pre, #block-region-side-post, .block, .navbar').forEach(el => el.remove());
-            let main = doc.querySelector('#region-main, [role="main"], #maincontent, .course-content') || doc.body;
-            if(pId && main.innerHTML.includes(`id=${pId}`)) profeEncontrado = true;
-            doc.querySelectorAll('.forumpost, article.forum-post, tr.discussion, .discussion-list-item, td.author, a[href*="user/view.php"]').forEach(post => {
-                let html = post.innerHTML || "";
-                if (pId && html.includes(`id=${pId}`)) profeEncontrado = true;
-                let imgAutor = post.querySelector('img.userpicture');
-                let linkAutor = post.tagName.toLowerCase() === 'a' ? post : post.querySelector('a[href*="user/view.php"], a[href*="user/profile.php"]');
+        function analizarContenidoForo(doc) {
+            let areaPrincipal = doc.querySelector('#region-main, #content, .main-content, #page-content') || doc.body;
+            let userLinks = areaPrincipal.querySelectorAll('a[href*="user/view.php"], a[href*="user/profile.php"]');
+            
+            userLinks.forEach(a => {
+                let href = a.href || "";
+                let matchId = href.match(/[?&]id=(\d+)/);
+                let uid = matchId ? matchId[1] : null;
                 
-                if(imgAutor || linkAutor){
-                    let n = ((linkAutor ? linkAutor.textContent : "") || (imgAutor ? imgAutor.getAttribute('alt') : "") || "").replace(/Imagen de /gi, "").trim();
-                    if(n.length > 3 && !n.toLowerCase().includes('profesor') && !n.toLowerCase().includes('docente')) estudiantes.add(n);
+                if (uid && pId && String(uid) === String(pId)) {
+                    profeEncontrado = true;
+                } else {
+                    let clon = a.cloneNode(true);
+                    clon.querySelectorAll('.userinitials, .initials, .sr-only, .accesshide').forEach(el => el.remove());
+                    let nombre = clon.textContent.replace(/\s+/g, ' ').trim();
+                    
+                    if (nombre && nombre.length > 2 && !nombre.toLowerCase().includes('profesor') && !nombre.toLowerCase().includes('docente')) {
+                        estudiantes.add(nombre);
+                    }
                 }
             });
         }
-        escanearDoc(dForo);
-        if(!profeEncontrado) {
-            let linksDebates = Array.from(dForo.querySelectorAll('a[href*="discuss.php?d="]')).map(a => a.href.split('#')[0]);
-            let linksUnicos = [...new Set(linksDebates)].slice(0, 8); 
-            for(let link of linksUnicos) {
-                if(profeEncontrado) break; 
-                try {
-                    let rDeb = await fetch(link);
-                    if(!rDeb.ok) continue;
-                    let textDeb = await rDeb.text();
-                    if (pId && (textDeb.includes(`id=${pId}`) || textDeb.includes(`userid":${pId}`) || textDeb.includes(`userid":"${pId}"`))) {
-                        profeEncontrado = true; break;
-                    }
-                    let docDeb = new DOMParser().parseFromString(textDeb, "text/html");
-                    escanearDoc(docDeb);
-                } catch(e){}
-            }
+        analizarContenidoForo(dForo);
+        let areaMain = dForo.querySelector('#region-main, #content, .main-content, #page-content') || dForo.body;
+        let linksDebates = Array.from(areaMain.querySelectorAll('a[href*="discuss.php?d="]')).map(a => a.href.split('#')[0]);
+        let linksUnicos = [...new Set(linksDebates)].slice(0, 6);
+        for (let link of linksUnicos) {
+            if (profeEncontrado) break;
+            try {
+                let rDeb = await fetchSeguro(link);
+                if (!rDeb.ok) continue;
+                let docDeb = new DOMParser().parseFromString(await rDeb.text(), "text/html");
+                analizarContenidoForo(docDeb);
+                await esperar(250);
+            } catch(e) {}
         }
-        if(profeEncontrado) return `<span style='color:#27ae60;font-weight:bold;'>✅ Sí</span>${linkDebug}`;
+        if (profeEncontrado) return `<span style='color:#27ae60;font-weight:bold;'>✅ Sí</span>${linkDebug}`;
         
+        if (aunNoInicia) {
+            return `<span style='color:#f39c12;font-weight:bold;'>🟡 Aún no inicia</span>${linkDebug}`;
+        }
         let arrEstudiantes = Array.from(estudiantes);
-        if(arrEstudiantes.length === 0) return `<span style='color:#c0392b;font-weight:bold;'>❌ No</span><br><small style='font-size:10px;color:#888;'>Sin discusiones</small>${linkDebug}`;
+        if (arrEstudiantes.length === 0) {
+            return `<span style='color:#c0392b;font-weight:bold;'>❌ No hay foro</span><br><small style='font-size:10px;color:#888;'>Sin discusiones</small>${linkDebug}`;
+        }
         
         let muestra = arrEstudiantes.slice(0, 2).join(', ');
-        if(arrEstudiantes.length > 2) muestra += '...';
-        return `<span style='color:#c0392b;font-weight:bold;'>❌ No</span><br><small style='font-size:10px;color:#888;'>Alumnos: ${muestra}</small>${linkDebug}`;
+        if (arrEstudiantes.length > 2) muestra += '...';
+        return `<span style='color:#c0392b;font-weight:bold;'>❌ No hay foro</span><br><small style='font-size:10px;color:#888;'>Alumnos: ${muestra}</small>${linkDebug}`;
         
-    }catch(e){return "<span style='color:#7f8c8d;'>⚠️ Error</span>";}
+    } catch(e) { 
+        return aunNoInicia 
+            ? `<span style='color:#f39c12;font-weight:bold;'>🟡 Aún no inicia</span>` 
+            : "<span style='color:#7f8c8d;'>⚠️ Error</span>"; 
+    }
 }
-
 iniciarPanelUI();
 })();
